@@ -4,20 +4,23 @@ void gioca();
 
 void termina_gioco();
 
-const short int MIN_PLAYER = 1;
-const short int MAX_PLAYER = 4;
+#define MIN_PLAYER 1
+#define MAX_PLAYER 4
+#define nicknameLength 12
 
-enum classe_giocatore {
+enum classe_giocatore
+{
     barbaro,
     nano,
-    elfo
+    elfo,
+    mago
 };
 
 struct Giocatore
 {
     char nome_giocatore[12];
     enum classe_giocatore classe;
-    struct Zona_segrete* posizione;
+    struct Zona_segrete *posizione;
     unsigned char p_vita;
     unsigned char dadi_attacco;
     unsigned char dadi_difesa;
@@ -25,7 +28,8 @@ struct Giocatore
     unsigned char potere_speciale;
 };
 
-enum tipo_zona {
+enum tipo_zona
+{
     corridoio,
     scala,
     scala_banchetto,
@@ -38,27 +42,26 @@ enum tipo_zona {
     tempio
 };
 
-enum tipo_tesoro {
+enum tipo_tesoro
+{
     nessun_tesoro,
     veleno,
     guarigione,
     doppia_guarigione
 };
 
-enum tipo_porta {
+enum tipo_porta
+{
     nessuna_porta,
     porta_normale,
     porta_da_scassinare
 };
 
-struct Zona_segrete {
-    struct Zone_segrete* zona_successiva;
-    struct Zone_segrete* zona_precedente;
+struct Zona_segrete
+{
+    struct Zone_segrete *zona_successiva;
+    struct Zone_segrete *zona_precedente;
     enum tipo_zona tipoZona;
     enum tipo_tesoro tipoTesoro;
     enum tipo_porta tipoPorta;
-    
 };
-
-
-

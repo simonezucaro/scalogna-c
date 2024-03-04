@@ -1,12 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 void imposta_gioco();
-
-void function1()
-{
-    printf("Hai scelto la funzione 1\n");
-};
 
 void function2()
 {
@@ -17,7 +11,6 @@ void function3()
 {
     printf("Hai scelto la funzione 3\n");
 };
-
 
 int main()
 {
@@ -35,18 +28,22 @@ int main()
         {
             choice = -1;
             printf("Attenzione! Inserire un numero intero!\n");
-        } else if(choice >= 1 && choice <= 3) {
+        }
+        else if (choice >= 1 && choice <= 3)
+        {
             (*f[choice - 1])();
-        } else {
+        }
+        else
+        {
             // If the user enters a value that is not between 1 and 3, the choice value will be set to -1
             // and the while loop will be executed again
             choice = -1;
             printf("Attenzione! Inserire un numero compreso tra 1 e 3!\n");
-        
         }
 
-        while ((getchar()) != '\n');
-    } while ((choice >= 1 && choice <= 3 ) || (choice == -1));
+        while ((getchar()) != '\n')
+            ;
+    } while ((choice >= 1 && choice <= 3) || (choice == -1));
 
     return 0;
 }
