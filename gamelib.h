@@ -7,6 +7,7 @@ void termina_gioco();
 #define MIN_PLAYER 1
 #define MAX_PLAYER 4
 #define nicknameLength 12
+#define numberOfZonaSegrete 15
 
 enum classe_giocatore
 {
@@ -59,8 +60,8 @@ enum tipo_porta
 
 struct Zona_segrete
 {
-    struct Zone_segrete *zona_successiva;
-    struct Zone_segrete *zona_precedente;
+    struct Zona_segrete* zona_successiva;
+    struct Zona_segrete* zona_precedente;
     enum tipo_zona tipoZona;
     enum tipo_tesoro tipoTesoro;
     enum tipo_porta tipoPorta;

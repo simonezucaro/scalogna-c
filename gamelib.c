@@ -9,6 +9,8 @@ static void getPlayersNumber(short int *playersNumber);
 static void initPlayers(struct Giocatore *giocatori, short int playersNumber);
 static short int setGameMaster(struct Giocatore *giocatori, short int playersNumber);
 
+struct Zona_segrete* createZonaSegrete(enum tipo_zona tipoZona, enum tipo_tesoro tipoTesoro, enum tipo_porta tipoPorta, short int index, struct Zona_segrete** zoneSegrete);
+
 
 void imposta_gioco()
 {
@@ -28,7 +30,28 @@ void imposta_gioco()
     }
 
     short int gameMasterIndex = setGameMaster(giocatori, playersNumber);
+    printf("%s è evoluto a Game Master, complimenti! :D\n", giocatori[gameMasterIndex].nome_giocatore);
+
+
+    struct Zona_segrete* pFirst;
+    struct Zona_segrete* pLast;
+    struct Zona_segrete** zoneSegrete = malloc(numberOfZonaSegrete * sizeof(struct Zona_segrete));
+    
+
+    for (int i = 0; i < numberOfZonaSegrete; i++)
+    {
+        zoneSegrete[i] = createZonaSegrete(corridoio, nessun_tesoro, nessuna_porta, i, zoneSegrete);
+    }
+
+    pFirst = zoneSegrete[0];
+    pLast = zoneSegrete[numberOfZonaSegrete - 1];
+
+    printf("Zona segreta iniziale: %d\n", zoneSegrete[1]->zona_precedente->tipoZona);
+
+    
 }
+
+// Inizializzazione giocatori
 
 static int srandomNumberGenerator(int min, int max)
 {
@@ -151,7 +174,7 @@ static short int setGameMaster(struct Giocatore *giocatori, short int playersNum
     size_t i;
     for (i = 0; i < playersNumber; i++)
     {
-        printf("%zu. %s", i + 1, giocatori[i].nome_giocatore);
+        printf("%zu. %s\n", i + 1, giocatori[i].nome_giocatore);
     }
     short int gameMaster;
     do
@@ -160,5 +183,34 @@ static short int setGameMaster(struct Giocatore *giocatori, short int playersNum
         while ((getchar()) != '\n')
             ;
     } while (gameMaster < 1 || gameMaster > playersNumber);
+
+    return gameMaster -1;
 }
 
+// Generazione mappa di gioco
+
+struct Zona_segrete* createZonaSegrete(enum tipo_zona tipoZona, enum tipo_tesoro tipoTesoro, enum tipo_porta tipoPorta, short int index, struct Zona_segrete** zoneSegrete) {
+    struct Zona_segrete* pNew = (struct Zona_segrete*)malloc(sizeof(struct Zona_segrete));
+    if (pNew == NULL) {
+        printf("Errore nella creazione della zona segreta :/\n");
+        exit(1);
+    }
+    pNew->tipoZona = tipoZona;
+    pNew->tipoTesoro = tipoTesoro;
+    pNew->tipoPorta = tipoPorta;
+
+    if(index != 0) {
+        pNew->zona_precedente = zoneSegrete[index - 1];
+    } else {
+        pNew->zona_precedente = NULL;
+    }
+    
+    if(index != numberOfZonaSegrete - 1) {
+        pNew->zona_successiva = zoneSegrete[index + 1];
+    } else {
+        pNew->zona_successiva = NULL;
+    }
+
+
+    return pNew;
+}
