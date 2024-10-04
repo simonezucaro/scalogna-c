@@ -2,10 +2,7 @@
 
 void imposta_gioco();
 
-void function2()
-{
-    printf("Hai scelto la funzione 2\n");
-};
+void gioca();
 
 void function3()
 {
@@ -16,7 +13,7 @@ int main()
 {
 
     int choice = 0;
-    void (*f[3])() = {imposta_gioco, function2, function3};
+    void (*f[3])() = {imposta_gioco, gioca, function3};
 
     do
     {

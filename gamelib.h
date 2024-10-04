@@ -29,6 +29,8 @@ struct Giocatore
     unsigned char potere_speciale;
 };
 
+typedef struct Giocatore Giocatore;
+
 enum tipo_zona
 {
     corridoio,
@@ -66,3 +68,5 @@ struct Zona_segrete
     enum tipo_tesoro tipoTesoro;
     enum tipo_porta tipoPorta;
 };
+
+typedef struct Zona_segrete Zona_segrete;
