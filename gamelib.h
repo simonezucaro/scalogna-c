@@ -1,3 +1,5 @@
+#include "utils.h"
+
 void imposta_gioco();
 
 void gioca();
@@ -27,6 +29,7 @@ struct Giocatore
     unsigned char dadi_difesa;
     unsigned char mente;
     unsigned char potere_speciale;
+    unsigned char punti_vita_max;
 };
 
 typedef struct Giocatore Giocatore;
@@ -69,4 +72,13 @@ struct Zona_segrete
     enum tipo_porta tipoPorta;
 };
 
+struct Abitante_segrete {
+    char nome[12];
+    unsigned char dadi_attacco;
+    unsigned char dadi_difesa;
+    unsigned char punti_vita;
+    unsigned char punti_vita_max;
+};
+
+typedef struct Abitante_segrete Abitante_segrete;
 typedef struct Zona_segrete Zona_segrete;

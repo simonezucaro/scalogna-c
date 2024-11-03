@@ -1,8 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <time.h>
-#include <stdbool.h>
 #include "gamelib.h"
 
 // ####### Global variables #######
@@ -10,7 +5,7 @@
 // MAP
 Zona_segrete *firstZonaSegreta = NULL;
 Zona_segrete *lastZonaSegreta = NULL;
-static bool mappaCreata = false;
+static bool isGameInitialized = false;
 
 // GAME
 Giocatore *giocatori = NULL;
@@ -18,15 +13,24 @@ short int playersNumber = 0;
 unsigned short int actualTurn = 0;
 Zona_segrete **playersCurrentZone = NULL;
 bool *turnsArray = NULL;
+bool *playersDead = NULL;
+Giocatore *gameMaster = NULL;
+Giocatore *gameWinner = NULL;
 
-// Misc
-void resetGame();
+// Utils
+static void resetGame();
+static int getNumberByProbability(const double probability[], int numElements);
+static int diceThrow(int min, int max, char *message, bool abitante);
+static Abitante_segrete *figureAbitanteSegrete();
+static void regenerateZoneSegrete();
+static void visualizzaBarraVita(char *nome, int vita_attuale, int vita_massima);
+static void setDeadPlayer();
 
 // Players
 static int srandomNumberGenerator(int min, int max);
 static void getPlayersNumber(short int *playersNumber);
-static void initPlayers(Giocatore *giocatori, short int playersNumber);
-static short int setGameMaster(Giocatore *giocatori, short int playersNumber);
+static void initPlayers();
+static Giocatore *setGameMaster();
 
 // Map
 static void fillZonaSegreta(Zona_segrete *zonaSegreta);
@@ -39,21 +43,56 @@ static void chiudi_mappa();
 static void printMenuMappa();
 
 // Game
-bool getAllPlayersPlayed();
-void selectTurn();
-void passTurn();
+static bool getAllPlayersPlayed();
+static void printMenuGiocatore();
+static void selectTurn();
+// static void passTurn();
 
-bool apri_porta(enum tipo_porta tipoPorta);
-bool combatti();
-void avanza();
-void indietreggia();
+static bool apri_porta(enum tipo_porta tipoPorta);
+static bool combatti(Abitante_segrete *abitante);
+static void avanza();
+static void indietreggia();
 
-void stampa_giocatore();
-void stampa_zona();
+static void stampa_giocatore();
+static void stampa_zona();
 
-void prendi_tesoro();
-void scappa();
-void gioca_potere_speciale();
+static void prendi_tesoro();
+static void scappa();
+static bool gioca_potere_speciale();
+
+// MENU DATA
+const char *menuGiocatoreName = "Menu Giocatore";
+const char *optionsMenuGiocatore[] = {
+    "Avanza",
+    "Indietreggia",
+    "Stampa Giocatore",
+    "Stampa Zona",
+    "Prendi Tesoro",
+    "Passa il turno"};
+int numOptionsGiocatore = sizeof(optionsMenuGiocatore) / sizeof(optionsMenuGiocatore[0]);
+
+const char *menuMappaName = "Menu Mappa";
+const char *optionsMenuMappa[] = {
+    "Genera Mappa",
+    "Inserisci Zona",
+    "Cancella Zona",
+    "Stampa Mappa",
+    "Chiudi Menu Mappa"};
+int numOptionsMappa = sizeof(optionsMenuMappa) / sizeof(optionsMenuMappa[0]);
+
+const char *menuCombattimentoName = "Menu Combattimento";
+const char *optionsMenuCombattimento[] = {
+    "Combatti",
+    "Scappa",
+    "Gioca Potere Speciale"};
+int numOptionsCombattimento = sizeof(optionsMenuCombattimento) / sizeof(optionsMenuCombattimento[0]);
+
+const char *menuAzioneName = "Menu Azione";
+const char *optionsMenuAzione[] = {
+    "Attacca",
+    "Difenditi",
+    "Curati"};
+int numOptionsAzione = sizeof(optionsMenuAzione) / sizeof(optionsMenuAzione[0]);
 
 /**
  * @brief Sets up the game environment.
@@ -71,20 +110,35 @@ void gioca_potere_speciale();
 void imposta_gioco()
 {
     resetGame();
+    clearScreen();
+    printCustomHeader("CREAZIONE GIOCATORI");
+
     getPlayersNumber(&playersNumber);
     turnsArray = (bool *)calloc(playersNumber, sizeof(int));
+    playersDead = (bool *)calloc(playersNumber, sizeof(int));
+    for (int i = 0; i < playersNumber; i++)
+    {
+        turnsArray[i] = false;
+        playersDead[i] = false;
+    }
     playersCurrentZone = (Zona_segrete **)calloc(playersNumber, sizeof(Zona_segrete *));
 
     if (turnsArray == NULL)
     {
-        printf("Errore nell'allocazione della memoria per l'array dei turni :/\n");
-        exit(1);
+        fprintf(stderr, "Errore nell'allocazione della memoria per l'array dei turni :/\n");
+        exit(EXIT_FAILURE);
     }
 
-    if(playersCurrentZone == NULL)
+    if (playersDead == NULL)
     {
-        printf("Errore nell'allocazione della memoria per l'array delle zone dei giocatori :/\n");
-        exit(1);
+        fprintf(stderr, "Errore nell'allocazione della memoria per l'array dei giocatori morti :/\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (playersCurrentZone == NULL)
+    {
+        fprintf(stderr, "Errore nell'allocazione della memoria per l'array delle zone dei giocatori :/\n");
+        exit(EXIT_FAILURE);
     }
 
     for (int i = 0; i < playersNumber; i++)
@@ -96,20 +150,74 @@ void imposta_gioco()
     giocatori = (Giocatore *)calloc(playersNumber, sizeof(Giocatore));
     if (giocatori == NULL)
     {
-        printf("Errore nella creazione dei giocatori :/\n");
-        exit(1);
+        fprintf(stderr, "Errore nella creazione dei giocatori :/\n");
+        exit(EXIT_FAILURE);
     }
     else
     {
-        initPlayers(giocatori, playersNumber);
+        initPlayers();
     }
 
-    short int gameMasterIndex = setGameMaster(giocatori, playersNumber);
-    printf("%s è evoluto a Game Master, complimenti! :D\n", giocatori[gameMasterIndex].nome_giocatore);
+    clearScreen();
+    gameMaster = setGameMaster();
+    char message[100];
+    sprintf(message, "\n%s e' evoluto a Game Master! E' arrivato il momento di creare la mappa di gioco!", gameMaster->nome_giocatore);
+    printGameEvent(message, BLUE);
 
     // ######################## MAP ########################
+    printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
     printMenuMappa();
-    return;
+}
+
+/**
+ * @brief Selects an index based on a given probability distribution.
+ *
+ * This function takes an array of probabilities and the number of elements in the array,
+ * and returns an index based on the probability distribution. The sum of the probabilities
+ * must be approximately 1.0.
+ *
+ * @param probability An array of probabilities.
+ * @param numElements The number of elements in the probability array.
+ * @return The selected index based on the probability distribution.
+ */
+static int getNumberByProbability(const double probability[], int numElements)
+{
+    // Calculate the sum of probabilities to ensure it is approximately 1.0
+    double sumProbability = 0.0;
+    for (int i = 0; i < numElements; i++)
+    {
+        sumProbability += probability[i];
+    }
+
+    // Verify that the sum of probabilities is close to 1.0
+    if (sumProbability < 0.9999 || sumProbability > 1.0001)
+    {
+        fprintf(stderr, "Error: The sum of probabilities must be 1.0 (current: %f)\n", sumProbability);
+        exit(EXIT_FAILURE);
+    }
+
+    // Create the cumulative distribution
+    double cumulativeDistribution[numElements];
+    cumulativeDistribution[0] = probability[0];
+    for (int i = 1; i < numElements; i++)
+    {
+        cumulativeDistribution[i] = cumulativeDistribution[i - 1] + probability[i];
+    }
+
+    // Generate a random number between 0 and 1
+    double randomFraction = rand() / (RAND_MAX + 1.0);
+
+    // Find the corresponding index in the cumulative distribution
+    for (int i = 0; i < numElements; i++)
+    {
+        if (randomFraction < cumulativeDistribution[i])
+        {
+            return i;
+        }
+    }
+
+    // In case no index is found (due to rounding), return the last index
+    return numElements - 1;
 }
 
 /**
@@ -120,7 +228,7 @@ void imposta_gioco()
  * - Sets the `firstZonaSegreta` and `lastZonaSegreta` pointers to NULL.
  * - Frees the memory allocated for the `giocatori` array, if it is not NULL.
  * - Sets the `giocatori` pointer to NULL.
- * - Sets the `mappaCreata` flag to false.
+ * - Sets the `isGameInitialized` flag to false.
  */
 void resetGame()
 {
@@ -140,7 +248,66 @@ void resetGame()
         free(giocatori);
         giocatori = NULL;
     }
-    mappaCreata = false;
+    isGameInitialized = false;
+}
+
+static int diceThrow(int min, int max, char *message, bool abitante)
+{
+    printGameEvent(message, BLUE);
+    if (abitante)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            printf(".");
+            fflush(stdout);
+#ifdef _WIN32
+            Sleep(500);
+#else
+            sleep(1);
+#endif
+        }
+    }
+    else
+    {
+        // printf("Premi qualsiasi tasto per lanciare il dado...\n");
+        clearInputBuffer();
+        getchar();
+    }
+    return srandomNumberGenerator(min, max);
+}
+
+static Abitante_segrete *figureAbitanteSegrete()
+{
+    // Define the possible names for the inhabitants
+    const char *names[] = {"Goblin", "Orco", "Troll", "Scheletro", "Zombie", "Yuri"};
+    int numNames = sizeof(names) / sizeof(names[0]);
+
+    // Create an Abitante_segrete struct and populate it with random characteristics
+    Abitante_segrete *abitante = (Abitante_segrete *)malloc(sizeof(Abitante_segrete));
+    strncpy(abitante->nome, names[srandomNumberGenerator(0, numNames - 1)], sizeof(abitante->nome) - 1);
+    abitante->nome[sizeof(abitante->nome) - 1] = '\0';     // Ensure null-termination
+    abitante->dadi_attacco = srandomNumberGenerator(1, 3); // Attack dice between 1 and 3
+    abitante->dadi_difesa = srandomNumberGenerator(1, 3);  // Defense dice between 1 and 3
+    abitante->punti_vita = giocatori[actualTurn].p_vita + srandomNumberGenerator(1, 3);
+    abitante->punti_vita_max = abitante->punti_vita;
+
+    // Print the generated characteristics
+    char message[256];
+    snprintf(message, sizeof(message), "E' apparso un abitante delle segrete, un %s! Punti vita: %d, Dadi Attacco: %d, Dadi Difesa: %d",
+             abitante->nome, abitante->punti_vita, abitante->dadi_attacco, abitante->dadi_difesa);
+    printGameEvent(message, YELLOW);
+    return abitante;
+}
+
+static void regenerateZoneSegrete()
+{
+    Zona_segrete *current = firstZonaSegreta;
+    while (current != NULL)
+    {
+        current->tipoTesoro = getNumberByProbability((double[]){0.25, 0.25, 0.25, 0.25}, 4);
+        current->tipoPorta = getNumberByProbability((double[]){0.33333, 0.33333, 0.33333}, 3);
+        current = current->zona_successiva;
+    }
 }
 
 // Players initialization
@@ -176,7 +343,7 @@ static void getPlayersNumber(short int *playersNumber)
 {
     do
     {
-        printf("Inserisci il numero di giocatori (min 1, max 4): ");
+        printf("\nInserisci il numero di giocatori (min 1, max 4): ");
         scanf("%hd", playersNumber);
         while ((getchar()) != '\n')
             ;
@@ -203,28 +370,31 @@ static void getPlayersNumber(short int *playersNumber)
  *
  * Note: The function uses fflush(stdin) and fflush(stdout) to clear the input and output buffers.
  */
-static void initPlayers(Giocatore *giocatori, short int playersNumber)
+static void initPlayers()
 {
     for (int i = 0; i < playersNumber; i++)
     {
-        fflush(stdin);
-        fflush(stdout);
-        printf("Ciao Giocatore %d, configura il tuo personaggio :D\n", i + 1);
-        puts("---------------------------------------------");
+        clearScreen();
+        printCustomHeader("CREAZIONE GIOCATORI");
+        printf("\nGiocatore %d, configura il tuo personaggio :D\n\n", i + 1);
 
         printf("Inserisci il tuo nickname (MAX. %d caratteri): ", nicknameLength);
         fgets(giocatori[i].nome_giocatore, nicknameLength, stdin);
+        size_t len = strlen(giocatori[i].nome_giocatore);
+        if (len > 0 && giocatori[i].nome_giocatore[len - 1] == '\n')
+        {
+            giocatori[i].nome_giocatore[len - 1] = '\0';
+        }
 
-        printf("Benvenuto ");
-        printf("%s", giocatori[i].nome_giocatore);
-        printf(" su Scalogna Quest!\n\n");
-
-        printf("Scegli la tua classe:\n");
-        printf("1. Barbaro\n");
-        printf("2. Nano\n");
-        printf("3. Elfo\n");
-        printf("4. Mago\n");
+        clearScreen();
+        printCustomHeader("CREAZIONE GIOCATORI");
+        printf("\nScegli la tua classe:\n\n");
+        printf("1. Barbaro (Attacco: 3, Difesa: 2, Vita: 8, Mente: 1-2, Potere Speciale: 0)\n");
+        printf("2. Nano (Attacco: 2, Difesa: 2, Vita: 7, Mente: 2-3, Potere Speciale: 1)\n");
+        printf("3. Elfo (Attacco: 2, Difesa: 2, Vita: 6, Mente: 3-4, Potere Speciale: 1)\n");
+        printf("4. Mago (Attacco: 1, Difesa: 2, Vita: 4, Mente: 4-5, Potere Speciale: 3)\n");
         short int classe;
+
         do
         {
             scanf("%hd", &classe);
@@ -235,43 +405,49 @@ static void initPlayers(Giocatore *giocatori, short int playersNumber)
         switch (classe)
         {
         case 1:
-            printf("Hai scelto la classe Barbaro!\n");
+            printf("\nHai scelto la classe Barbaro!\n");
             giocatori[i].dadi_attacco = 3;
             giocatori[i].dadi_difesa = 2;
             giocatori[i].p_vita = 8;
+            giocatori[i].punti_vita_max = 8;
             giocatori[i].mente = srandomNumberGenerator(1, 2);
             giocatori[i].potere_speciale = 0;
             break;
         case 2:
-            printf("Hai scelto la classe Nano!\n");
+            printf("\nHai scelto la classe Nano!\n");
             giocatori[i].dadi_attacco = 2;
             giocatori[i].dadi_difesa = 2;
             giocatori[i].p_vita = 7;
+            giocatori[i].punti_vita_max = 7;
             giocatori[i].mente = srandomNumberGenerator(2, 3);
             giocatori[i].potere_speciale = 1;
             break;
         case 3:
-            printf("Hai scelto la classe Elfo!\n");
+            printf("\nHai scelto la classe Elfo!\n");
             giocatori[i].dadi_attacco = 2;
             giocatori[i].dadi_difesa = 2;
             giocatori[i].p_vita = 6;
+            giocatori[i].punti_vita_max = 6;
             giocatori[i].mente = srandomNumberGenerator(3, 4);
             giocatori[i].potere_speciale = 1;
             break;
         case 4:
-            printf("Hai scelto la classe Mago!\n");
+            printf("\nHai scelto la classe Mago!\n");
             giocatori[i].dadi_attacco = 1;
             giocatori[i].dadi_difesa = 2;
             giocatori[i].p_vita = 4;
+            giocatori[i].punti_vita_max = 4;
             giocatori[i].mente = srandomNumberGenerator(4, 5);
             giocatori[i].potere_speciale = 3;
             break;
         default:
-            printf("Errore nella scelta della classe. :/ Riavvia il gioco\n");
+            printf("\nErrore nella scelta della classe. :/ Riavvia il gioco\n");
             break;
         }
 
-        printf("%s fai una scelta!\n", giocatori[i].nome_giocatore);
+        clearScreen();
+        printCustomHeader("CREAZIONE GIOCATORI");
+        printf("\nFai una scelta!\n\n");
         printf("1. Sacrificare un punto mente per +1 punto vita\n");
         printf("2. Sacrificare un punto vita per +1 punto mente\n");
         printf("3. Nessuna delle due\n");
@@ -283,6 +459,7 @@ static void initPlayers(Giocatore *giocatori, short int playersNumber)
                 ;
         } while (choice < 1 || choice > 4);
 
+        printf("\n");
         switch (choice)
         {
         case 1:
@@ -291,7 +468,10 @@ static void initPlayers(Giocatore *giocatori, short int playersNumber)
             printf("Hai sacrificato un punto mente per +1 punto vita\n");
             break;
         case 2:
-            giocatori[i].p_vita--;
+            if (giocatori[i].p_vita > 0)
+            {
+                giocatori[i].p_vita--;
+            }
             giocatori[i].mente++;
             printf("Hai sacrificato un punto vita per +1 punto mente\n");
             break;
@@ -312,15 +492,18 @@ static void initPlayers(Giocatore *giocatori, short int playersNumber)
  * @param playersNumber The total number of players.
  * @return The index of the selected game master (0-based).
  */
-static short int setGameMaster(Giocatore *giocatori, short int playersNumber)
+static Giocatore *setGameMaster()
 {
-    printf("La partita sta per iniziare! Scegliete il game master:\n");
+    clearScreen();
+    printCustomHeader("CREAZIONE GIOCATORI");
+    printf("\nGiocatori! E' arrivato il momento di scegliere il game master:\n\n");
     size_t i;
     for (i = 0; i < playersNumber; i++)
     {
         printf("%zu. %s\n", i + 1, giocatori[i].nome_giocatore);
     }
     short int gameMaster;
+    puts("\n");
     do
     {
         scanf("%hd", &gameMaster);
@@ -328,7 +511,7 @@ static short int setGameMaster(Giocatore *giocatori, short int playersNumber)
             ;
     } while (gameMaster < 1 || gameMaster > playersNumber);
 
-    return gameMaster - 1;
+    return &giocatori[gameMaster - 1];
 }
 
 // Game map generation
@@ -346,9 +529,13 @@ static short int setGameMaster(Giocatore *giocatori, short int playersNumber)
  */
 static void fillZonaSegreta(Zona_segrete *zonaSegreta)
 {
-    zonaSegreta->tipoZona = rand() % 10;  // 0 to 9
-    zonaSegreta->tipoTesoro = rand() % 4; // 0 to 3
-    zonaSegreta->tipoPorta = rand() % 3;  // 0 to 2
+    double tipoZonaProbability[10] = {0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1};
+    double tipoTesoroProbability[4] = {0.25, 0.25, 0.25, 0.25};
+    double tipoPortaProbability[3] = {0.33333, 0.33333, 0.33333};
+
+    zonaSegreta->tipoZona = getNumberByProbability(tipoZonaProbability, 10);
+    zonaSegreta->tipoTesoro = getNumberByProbability(tipoTesoroProbability, 4);
+    zonaSegreta->tipoPorta = getNumberByProbability(tipoPortaProbability, 3);
 }
 
 /**
@@ -372,8 +559,8 @@ static void createZoneSegrete(Zona_segrete **firstZonaSegretaLocal, Zona_segrete
         if (zonaSegreta == NULL)
         {
             // Print error message and exit if memory allocation fails
-            printf("Errore nella creazione della zona segreta :/\n");
-            exit(1);
+            fprintf(stderr, "Errore nell'allocazione della memoria per le zone segrete :/\n");
+            exit(EXIT_FAILURE);
         }
         else
         {
@@ -421,11 +608,13 @@ static void genera_mappa()
 
         firstZonaSegreta = firstZonaSegretaLocal;
         lastZonaSegreta = lastZonaSegretaLocal;
+        printGameEvent("\nMappa generata con successo!\n", GREEN);
     }
     else
     {
         createZoneSegrete(&firstZonaSegretaLocal, &lastZonaSegretaLocal);
         lastZonaSegreta->zona_successiva = firstZonaSegretaLocal;
+        printGameEvent("Sono state aggiunte ulteriori 15 zone alla mappa!\n", GREEN);
     }
 }
 
@@ -442,11 +631,11 @@ static void inserisci_zona(unsigned short int i)
 {
     if (i > numberOfZonaSegrete)
     {
-        printf("Posizione non valida.\n");
+        printGameEvent("Posizione non valida.\n", RED);
         return;
     }
 
-    if(firstZonaSegreta == NULL || lastZonaSegreta == NULL)
+    if (firstZonaSegreta == NULL || lastZonaSegreta == NULL)
     {
         genera_mappa();
         return;
@@ -456,8 +645,8 @@ static void inserisci_zona(unsigned short int i)
     Zona_segrete *newZonaSegreta = (Zona_segrete *)malloc(sizeof(Zona_segrete));
     if (newZonaSegreta == NULL)
     {
-        printf("Errore nella creazione della zona segreta :/\n");
-        exit(1);
+        fprintf(stderr, "Errore nella creazione della zona segreta/\n");
+        exit(EXIT_FAILURE);
     }
 
     // Initialize the new secret zone with random values
@@ -482,7 +671,7 @@ static void inserisci_zona(unsigned short int i)
     {
         // Traverse the list to find the insertion point
         Zona_segrete *current = firstZonaSegreta;
-        for (unsigned int j = 0; j < i - 1; j++)
+        for (unsigned int j = 1; j < i - 1; j++)
         {
             current = current->zona_successiva;
         }
@@ -499,6 +688,8 @@ static void inserisci_zona(unsigned short int i)
             lastZonaSegreta = newZonaSegreta;
         }
     }
+
+    printGameEvent("Zona segreta inserita con successo!\n", GREEN);
 }
 
 /**
@@ -520,20 +711,20 @@ static void inserisci_zona(unsigned short int i)
  */
 static void cancella_zona(unsigned short int i)
 {
-    if (i >= numberOfZonaSegrete)
+    if (i > numberOfZonaSegrete)
     {
-        printf("Posizione non valida.\n");
+        printGameEvent("Posizione non valida.\n", RED);
         return;
     }
 
-      if(firstZonaSegreta == NULL || lastZonaSegreta == NULL)
+    if (firstZonaSegreta == NULL || lastZonaSegreta == NULL)
     {
-        printf("La mappa non è stata ancora generata.\n");
+        printGameEvent("La mappa e' vuota.\n", RED);
         return;
     }
 
     Zona_segrete *toDelete = firstZonaSegreta;
-    for (unsigned int j = 0; j < i; j++)
+    for (unsigned int j = 1; j < i; j++)
     {
         toDelete = toDelete->zona_successiva;
     }
@@ -557,6 +748,7 @@ static void cancella_zona(unsigned short int i)
     }
 
     free(toDelete);
+    printGameEvent("Zona segreta cancellata con successo!\n", GREEN);
 }
 
 const char *tipo_zona_to_string(enum tipo_zona zona)
@@ -630,18 +822,22 @@ const char *tipo_porta_to_string(enum tipo_porta porta)
 static void stampa_mappa()
 {
     Zona_segrete *current = firstZonaSegreta;
+    int zoneCount = 1;
+    printf("\n==================== MAPPA DEL GIOCO ====================\n");
     while (current != NULL)
     {
-        printf("Zona Segreta:\n");
-        printf("Indirizzo Zona Attuale: %p\n", (void *)current);
-        printf("Tipo Zona: %s\n", tipo_zona_to_string(current->tipoZona));
-        printf("Tipo Tesoro: %s\n", tipo_tesoro_to_string(current->tipoTesoro));
-        printf("Tipo Porta: %s\n", tipo_porta_to_string(current->tipoPorta));
-        printf("Zona Precedente: %p\n", (void *)current->zona_precedente);
-        printf("Zona Successiva: %p\n", (void *)current->zona_successiva);
-        printf("-----------------------------\n");
+        printf("Zona %d:\n", zoneCount++);
+        printf("----------------------------------------\n");
+        printf("- Indirizzo Zona Attuale: %p\n", (void *)current);
+        printf("- Tipo Zona: %s\n", tipo_zona_to_string(current->tipoZona));
+        printf("- Tipo Tesoro: %s\n", tipo_tesoro_to_string(current->tipoTesoro));
+        printf("- Tipo Porta: %s\n", tipo_porta_to_string(current->tipoPorta));
+        printf("- Zona Precedente: %p\n", (void *)current->zona_precedente);
+        printf("- Zona Successiva: %p\n", (void *)current->zona_successiva);
+        printf("----------------------------------------\n");
         current = current->zona_successiva;
     }
+    printf("========================================================\n");
 }
 
 /**
@@ -654,75 +850,91 @@ static void stampa_mappa()
 void chiudi_mappa()
 {
     int count = 0;
-    do
+    Zona_segrete *current = firstZonaSegreta;
+    while (current != NULL)
     {
-        Zona_segrete *current = firstZonaSegreta;
-        while (current != NULL)
-        {
-            count++;
-            current = current->zona_successiva;
-        }
-    } while (count < 15);
-    mappaCreata = true;
+        count++;
+        current = current->zona_successiva;
+    }
+    if (count < numberOfZonaSegrete)
+    {
+        printGameEvent("Genera altre zone segrete prima di chiudere la mappa.\n", RED);
+        printMenuMappa();
+        return;
+    }
+    else
+    {
+        isGameInitialized = true;
+        clearScreen();
+    }
 }
 
 /**
  * @brief Displays the menu for map operations.
  *
  * This function displays a menu of options for map operations, including generating the map,
- * inserting a new secret zone, deleting a secret zone, printing the map, and closing the map.
+ * inserting a new secret zone, deleting a secret zone, printing the map, and closing the 1
  * The user can choose an option by entering the corresponding number.
  */
 void printMenuMappa()
 {
     int choice;
-    printf("Game master, e' arrivato il momento di creare la mappa di gioco!\n");
     do
     {
-        printf("######## Menu Mappa ########\n");
-        printf("1. Genera Mappa\n");
-        printf("2. Inserisci Zona\n");
-        printf("3. Cancella Zona\n");
-        printf("4. Stampa Mappa\n");
-        printf("5. Chiudi Mappa\n");
-        printf("Scelta: ");
-        scanf("%d", &choice);
-        while ((getchar()) != '\n')
-            ;
-
-        switch (choice)
+        if (scanf("%d", &choice) != 1)
         {
-        case 1:
-            genera_mappa();
-            break;
-        case 2:
-            printf("Inserisci la posizione della zona: ");
-            unsigned short int posizione;
-            scanf("%hu", &posizione);
-            inserisci_zona(posizione);
-            break;
-        case 3:
-            printf("Inserisci la posizione della zona da cancellare: ");
-            unsigned short int posizioneCancella;
-            scanf("%hu", &posizioneCancella);
-            cancella_zona(posizioneCancella);
-            break;
-        case 4:
-            stampa_mappa();
-            break;
-        case 5:
-            chiudi_mappa();
-            break;
-        default:
-            printf("Scelta non valida.\n");
-            break;
+            choice = -1;
+            printGameEvent("Attenzione! Inserire un numero intero!", RED);
+            clearInputBuffer();
         }
-    } while ((choice != 5) || (choice == -1));
+        else
+        {
+            switch (choice)
+            {
+            case 1:
+                clearScreen();
+                printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
+                genera_mappa();
+                break;
+            case 2:
+                clearScreen();
+                printf("Inserisci la posizione della zona: ");
+                unsigned short int posizione;
+                scanf("%hu", &posizione);
+                printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
+                inserisci_zona(posizione);
+                break;
+            case 3:
+                clearScreen();
+                printf("Inserisci la posizione della zona da cancellare: ");
+                unsigned short int posizioneCancella;
+                scanf("%hu", &posizioneCancella);
+                printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
+                cancella_zona(posizioneCancella);
+                break;
+            case 4:
+                // clearScreen();
+                stampa_mappa();
+                printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
+                break;
+            case 5:
+                clearScreen();
+                printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
+                chiudi_mappa();
+                break;
+            default:
+                clearScreen();
+                printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
+                printGameEvent("Scelta non valida!", RED);
+                break;
+            }
+        }
+    } while (choice != 5 || choice == -1);
 }
 
 // ######################## GAME ########################
 
-bool getAllPlayersPlayed()
+static bool getAllPlayersPlayed()
 {
     for (int i = 0; i < playersNumber; i++)
     {
@@ -732,6 +944,58 @@ bool getAllPlayersPlayed()
         }
     }
     return true;
+}
+
+void printMenuGiocatore()
+{
+    int choice;
+    bool passTurn = false;
+    do
+    {
+        if (scanf("%d", &choice) != 1)
+        {
+            choice = -1;
+            printGameEvent("Attenzione! Inserire un numero intero!", RED);
+            clearInputBuffer();
+        }
+        else
+        {
+            switch (choice)
+            {
+            case 1:
+                avanza();
+                passTurn = true;
+                break;
+            case 2:
+                clearScreen();
+                printCustomMenu(menuGiocatoreName, optionsMenuGiocatore, numOptionsGiocatore);
+                indietreggia();
+                break;
+            case 3:
+                clearScreen();
+                printCustomMenu(menuGiocatoreName, optionsMenuGiocatore, numOptionsGiocatore);
+                stampa_giocatore();
+                break;
+            case 4:
+                clearScreen();
+                printCustomMenu(menuGiocatoreName, optionsMenuGiocatore, numOptionsGiocatore);
+                stampa_zona();
+                break;
+            case 5:
+                prendi_tesoro();
+                passTurn = true;
+                break;
+            case 6:
+                passTurn = true;
+                break;
+            default:
+                printGameEvent("Scelta non valida!", RED);
+                break;
+            }
+        }
+    } while (!passTurn || choice == -1);
+    if (passTurn)
+        selectTurn();
 }
 
 /**
@@ -749,193 +1013,203 @@ bool getAllPlayersPlayed()
  * 5. Marks the selected player as having played their turn.
  * 6. Prints the name of the player whose turn it is.
  */
-void selectTurn()
+static void selectTurn()
 {
     unsigned short int turn = srandomNumberGenerator(0, playersNumber - 1);
     bool allPlayersPlayed = getAllPlayersPlayed();
 
     if (allPlayersPlayed)
     {
-        printf("Tutti i giocatori hanno giocato. Resetto i turni.\n");
+        regenerateZoneSegrete();
         for (int i = 0; i < playersNumber; i++)
         {
             turnsArray[i] = false;
         }
         turn = srandomNumberGenerator(0, playersNumber - 1);
-    } else {
-    while (turnsArray[turn])
-    {
-        turn = srandomNumberGenerator(0, playersNumber - 1);
     }
+    else
+    {
+        while (turnsArray[turn] || playersDead[turn])
+        {
+            turn = srandomNumberGenerator(0, playersNumber - 1);
+        }
     }
     turnsArray[turn] = true;
-    printf("E' il turno di %s\n", giocatori[turn].nome_giocatore);
+    actualTurn = turn;
+    printCustomMenu(menuGiocatoreName, optionsMenuGiocatore, numOptionsGiocatore);
+    char eventMessage[100];
+    snprintf(eventMessage, sizeof(eventMessage), "%s e' il tuo turno!", giocatori[turn].nome_giocatore);
+    printGameEvent(eventMessage, BLUE);
+    printMenuGiocatore();
 }
 
-void passTurn() {
-    unsigned short int nextTurn = (actualTurn + 1) % playersNumber;
-    bool allPlayersPlayed = getAllPlayersPlayed();
+// static void passTurn()
+// {
+//     unsigned short int nextTurn = (actualTurn + 1) % playersNumber;
+//     bool allPlayersPlayed = getAllPlayersPlayed();
 
-    if (allPlayersPlayed) {
-        selectTurn();
-    } else {
-        while (turnsArray[nextTurn]) {
-            nextTurn = (nextTurn + 1) % playersNumber;
-        }
-        actualTurn = nextTurn;
-        turnsArray[actualTurn] = true;
-        printf("E' il turno di %s\n", giocatori[actualTurn].nome_giocatore);
-    }
-}
+//     if (allPlayersPlayed)
+//     {
+//         selectTurn();
+//     }
+//     else
+//     {
+//         while (turnsArray[nextTurn])
+//         {
+//             nextTurn = (nextTurn + 1) % playersNumber;
+//         }
+//         actualTurn = nextTurn;
+//         turnsArray[actualTurn] = true;
+//         printf("E' il turno di %s\n", giocatori[actualTurn].nome_giocatore);
+//     }
+// }
 
-void avanza()
+static void avanza()
 {
     unsigned short int currentPlayer = actualTurn;
     Zona_segrete *currentZone = playersCurrentZone[currentPlayer];
 
     if (currentZone->zona_successiva == NULL)
     {
-        printf("Non ci sono più stanze in cui avanzare.\n");
+        printGameEvent("Non ci sono piu stanze in cui avanzare.", RED);
+    }
+
+    bool avanzato = apri_porta(currentZone->tipoPorta);
+
+    if (!avanzato)
+    {
         return;
     }
 
-    if (currentZone->tipoPorta == porta_normale || currentZone->tipoPorta == porta_da_scassinare)
+    playersCurrentZone[currentPlayer] = currentZone->zona_successiva;
+
+    double probability[3] = {0.33, 0.67, 0.0}; // 33% probability for the first element
+    if (getNumberByProbability(probability, 3) == 0 || playersCurrentZone[currentPlayer]->zona_successiva == NULL)
     {
-        if (!apri_porta(currentZone->tipoPorta))
-        {
-            printf("Non sei riuscito ad aprire la porta.\n");
-            return;
-        }
+        Abitante_segrete *abitante = figureAbitanteSegrete();
+        combatti(abitante);
     }
 
-    playersCurrentZone[currentPlayer] = currentZone->zona_successiva;
-    printf("Sei avanzato nella stanza successiva.\n");
-
-    if (rand() % 3 == 0 || playersCurrentZone[currentPlayer]->zona_successiva == NULL)
-    {
-        printf("Un abitante delle segrete è apparso!\n");
-        if (!combatti())
-        {
-            printf("Hai perso il combattimento. Non puoi avanzare ulteriormente.\n");
-            return;
-        }
+        if(playersCurrentZone[currentPlayer] == lastZonaSegreta) {
+        printGameEvent("Hai raggiunto l'ultima stanza delle segrete! Complimenti!", GREEN);
+        termina_gioco();
+        return;
     }
 }
 
-void indietreggia()
+static void indietreggia()
 {
     unsigned short int currentPlayer = actualTurn;
     Zona_segrete *currentZone = playersCurrentZone[currentPlayer];
 
     if (currentZone->zona_precedente == NULL)
     {
-        printf("Non ci sono più stanze in cui indietreggiare.\n");
+        printGameEvent("Non ci sono più stanze in cui avanzare.", RED);
         return;
     }
 
     playersCurrentZone[currentPlayer] = currentZone->zona_precedente;
-    printf("Sei indietreggiato nella stanza precedente.\n");
+    printGameEvent("Sei tornato nella stanza precedente.\n", BLUE);
 
-    if (rand() % 3 == 0)
+    double probability[3] = {0.33, 0.67, 0.0}; // 33% probability for the first element
+    if (getNumberByProbability(probability, 3) == 0)
     {
-        printf("Un abitante delle segrete è apparso!\n");
-        if (!combatti())
-        {
-            printf("Hai perso il combattimento. Non puoi indietreggiare ulteriormente.\n");
-            return;
-        }
+        Abitante_segrete *abitante = figureAbitanteSegrete();
+        combatti(abitante);
     }
 }
 
-void stampa_giocatore()
+static void stampa_giocatore()
 {
-    for (int i = 0; i < playersNumber; i++)
-    {
-        printf("Giocatore %d:\n", i + 1);
-        printf("Nome: %s\n", giocatori[i].nome_giocatore);
-        printf("Classe: %d\n", giocatori[i].classe);
-        printf("Dadi Attacco: %d\n", giocatori[i].dadi_attacco);
-        printf("Dadi Difesa: %d\n", giocatori[i].dadi_difesa);
-        printf("Punti Vita: %d\n", giocatori[i].p_vita);
-        printf("Mente: %d\n", giocatori[i].mente);
-        printf("Potere Speciale: %d\n", giocatori[i].potere_speciale);
-        printf("-----------------------------\n");
-    }
+    unsigned short int currentPlayer = actualTurn;
+    Giocatore *player = &giocatori[currentPlayer];
+
+    printf("\n==================== GIOCATORE ====================\n");
+    printf("Nome Giocatore: %s\n", player->nome_giocatore);
+    printf("Classe: %s\n", player->classe);
+    printf("Punti Vita: %d\n", player->p_vita);
+    printf("Punti Mente: %d\n", player->mente);
+    printf("Dadi Attacco: %d\n", player->dadi_attacco);
+    printf("Dadi Difesa: %d\n", player->dadi_difesa);
+    printf("Poteri Speciali: %d\n", player->potere_speciale);
+    printf("===================================================\n");
 }
 
-void stampa_zona()
+static void stampa_zona()
 {
     unsigned short int currentPlayer = actualTurn;
     Zona_segrete *currentZone = playersCurrentZone[currentPlayer];
 
-    printf("Zona Segreta:\n");
+    printf("\n==================== ZONA SEGRETA ====================\n");
     printf("Indirizzo Zona Attuale: %p\n", (void *)currentZone);
+    printf("------------------------------------------------------\n");
     printf("Tipo Zona: %s\n", tipo_zona_to_string(currentZone->tipoZona));
-    printf("Tesoro Presente: %s\n", currentZone->tipoTesoro != nessun_tesoro ? "Sì" : "No");
-    printf("Porta Presente: %s\n", currentZone->tipoPorta != nessuna_porta ? "Sì" : "No");
+    printf("Tesoro Presente: %s\n", currentZone->tipoTesoro != nessun_tesoro ? "Si" : "No");
+    printf("Porta Presente: %s\n", currentZone->tipoPorta != nessuna_porta ? "Si" : "No");
+    printf("------------------------------------------------------\n");
     printf("Zona Precedente: %p\n", (void *)currentZone->zona_precedente);
     printf("Zona Successiva: %p\n", (void *)currentZone->zona_successiva);
-    printf("-----------------------------\n");
+    printf("======================================================\n");
 }
 
-bool apri_porta(enum tipo_porta tipoPorta)
+static bool apri_porta(enum tipo_porta tipoPorta)
 {
     unsigned short int currentPlayer = actualTurn;
-    unsigned short int mindRoll = srandomNumberGenerator(1, 6);
-
-    printf("Hai tirato %hu per aprire la porta.\n", mindRoll);
 
     if (tipoPorta == porta_da_scassinare)
     {
+        unsigned short int mindRoll = diceThrow(1, 6, "Hai trovato una porta! Tira il dado per scassinarla...", false);
+
+        char message[100];
+        snprintf(message, sizeof(message), "E' uscito %hu.\n", mindRoll);
+        printGameEvent(message, BLUE);
+
         if (mindRoll <= giocatori[currentPlayer].mente)
         {
-            printf("Hai scassinato la porta con successo!\n");
+            printGameEvent("Hai scassinato la porta con successo!", GREEN);
             return true;
         }
         else
         {
-            printf("Non sei riuscito a scassinare la porta.\n");
-            int outcome = rand() % 100;
-            if (outcome < 10)
+            unsigned short int outcome = getNumberByProbability((double[]){0.1, 0.5, 0.4}, 3);
+            Abitante_segrete *abitante;
+            switch (outcome)
             {
-                printf("Sfortuna! Devi ricominciare dalla prima stanza delle segrete.\n");
+            case 0:
+                printGameEvent("Non sei riuscito a scassinare la porta! Sfortuna! Devi ricominciare dalla prima stanza delle segrete.", RED);
                 playersCurrentZone[currentPlayer] = firstZonaSegreta;
-            }
-            else if (outcome < 60)
-            {
-                printf("Hai perso un punto vita.\n");
-                giocatori[currentPlayer].p_vita--;
+                break;
+            case 1:
+                printGameEvent("Non sei riuscito a scassinare la porta! Hai perso un punto vita.", RED);
+                if (giocatori[currentPlayer].p_vita > 0)
+                {
+                    giocatori[currentPlayer].p_vita--;
+                }
                 if (giocatori[currentPlayer].p_vita <= 0)
                 {
-                    printf("Sei morto!\n");
-                    // Handle player death if necessary
+                    setDeadPlayer();
                 }
-            }
-            else
-            {
-                printf("Un abitante delle segrete è apparso!\n");
-                if (!combatti())
-                {
-                    printf("Hai perso il combattimento.\n");
-                    // Handle combat loss if necessary
-                }
+                break;
+            case 2:
+                abitante = figureAbitanteSegrete();
+                combatti(abitante);
+                break;
             }
             return false;
         }
     }
-    else if (mindRoll > 4)
+    else if (tipoPorta == nessuna_porta)
     {
-        printf("Hai aperto la porta con successo!\n");
+        printGameEvent("Non e' presente nessuna porta in questa stanza! Sei avanzato nella zona successiva!", GREEN);
         return true;
     }
-    else
     {
-        printf("Non sei riuscito ad aprire la porta.\n");
-        return false;
+        printGameEvent("Hai aperto la porta e sei avanzato nella zona successiva!", GREEN);
+        return true;
     }
 }
 
-void prendi_tesoro()
+static void prendi_tesoro()
 {
     unsigned short int currentPlayer = actualTurn;
     Zona_segrete *currentZone = playersCurrentZone[currentPlayer];
@@ -943,176 +1217,360 @@ void prendi_tesoro()
     switch (currentZone->tipoTesoro)
     {
     case veleno:
-        giocatori[currentPlayer].p_vita -= 2;
-        printf("Hai preso veleno! Hai perso 2 punti vita.\n");
+        if (giocatori[currentPlayer].p_vita > 2)
+        {
+            giocatori[currentPlayer].p_vita -= 2;
+        }
+        else
+        {
+            giocatori[currentPlayer].p_vita = 0;
+            setDeadPlayer();
+        }
+        printGameEvent("Hai preso veleno! Hai perso 2 punti vita.\n", RED);
         break;
     case guarigione:
         giocatori[currentPlayer].p_vita += 1;
-        printf("Hai preso guarigione! Hai guadagnato 1 punto vita.\n");
+        printGameEvent("Hai preso guarigione! Hai guadagnato 1 punto vita.\n", GREEN);
         break;
     case doppia_guarigione:
         giocatori[currentPlayer].p_vita += 2;
-        printf("Hai preso doppia guarigione! Hai guadagnato 2 punti vita.\n");
+        printGameEvent("Hai preso doppia guarigione! Hai guadagnato 2 punti vita.\n", GREEN);
         break;
     default:
-        printf("Non c'è nessun tesoro in questa stanza.\n");
+        printGameEvent("Non c'e' nessun tesoro in questa stanza.\n", YELLOW);
         return;
     }
 
     // Reset the treasure type to regenerate it for the next entry
-    currentZone->tipoTesoro = srandomNumberGenerator(0, 3); // 0 to 3 corresponds to enum tipo_tesoro
+    currentZone->tipoTesoro = nessun_tesoro;
 }
 
-void scappa()
+static void scappa()
 {
     unsigned short int currentPlayer = actualTurn;
-    unsigned short int mindRoll = srandomNumberGenerator(1, 6);
+    unsigned short int mindRoll = diceThrow(1, 6, "Hai trovato una via di fuga! Tira il dado per scappare...", false);
 
-    printf("Hai tirato %hu per scappare.\n", mindRoll);
+    char message[100];
+    snprintf(message, sizeof(message), "Hai tirato %hu per scappare.\n", mindRoll);
+    printGameEvent(message, BLUE);
 
     if (mindRoll <= giocatori[currentPlayer].mente)
     {
-        printf("Sei riuscito a scappare!\n");
-        indietreggia();
+        printGameEvent("Sei riuscito a scappare! Sei tornato nella stanza precedente!\n", GREEN);
+        playersCurrentZone[currentPlayer] = playersCurrentZone[currentPlayer]->zona_precedente;
     }
     else
     {
-        printf("Non sei riuscito a scappare. Subisci un attacco!\n");
-        unsigned short int attackRoll = srandomNumberGenerator(1, 6) + giocatori[currentPlayer].dadi_attacco;
-        unsigned short int defenseRoll = srandomNumberGenerator(1, 6) + (giocatori[currentPlayer].dadi_difesa / 2);
+        printGameEvent("Non sei riuscito a scappare. Stai subendo un attacco!\n", RED);
+        unsigned short int attackRoll = srandomNumberGenerator(1, 6);
+        unsigned short int defenseRoll = diceThrow(1, 6, "Tira il dado per difenderti dall'attacco...", false);
 
-        printf("Hai tirato %hu per l'attacco e %hu per la difesa.\n", attackRoll, defenseRoll);
+        // snprintf(message, sizeof(message), "Hai tirato %hu per la difesa.\n", defenseRoll);
+        // printGameEvent(message, BLUE);
+        int damage = attackRoll - defenseRoll;
 
-        if (attackRoll > defenseRoll)
+        if (damage > 0)
         {
-            printf("Hai perso il combattimento.\n");
-            // Handle combat loss if necessary
+            if (giocatori[currentPlayer].p_vita >= damage)
+            {
+                giocatori[currentPlayer].p_vita -= damage;
+            }
+            else
+            {
+                giocatori[currentPlayer].p_vita = 0;
+                setDeadPlayer();
+            }
+            snprintf(message, sizeof(message), "Durante l'attacco hai perso %d punti vita.\n", damage);
+            printGameEvent(message, RED);
         }
         else
         {
-            printf("Sei riuscito a difenderti dall'attacco.\n");
+            printGameEvent("Non hai subito danni durante l'attacco.\n", GREEN);
         }
     }
 }
 
-bool combatti()
+// Funzione per mostrare una barra di vita in ASCII
+void visualizzaBarraVita(char *nome, int vita_attuale, int vita_massima)
 {
-    unsigned short int currentPlayer = actualTurn;
-    unsigned short int playerRoll = srandomNumberGenerator(1, 6);
-    unsigned short int inhabitantRoll = srandomNumberGenerator(1, 6);
+    int lunghezza_barra = 20;                                             // Lunghezza della barra di vita
+    int lunghezza_vita = (vita_attuale * lunghezza_barra) / vita_massima; // Percentuale della barra
 
-    printf("Il giocatore ha tirato %hu.\n", playerRoll);
-    printf("L'abitante ha tirato %hu.\n", inhabitantRoll);
-
-    bool playerStarts = playerRoll >= inhabitantRoll;
-    bool playerTurn = playerStarts;
-
-    while (giocatori[currentPlayer].p_vita > 0 && inhabitantRoll > 0)
+    printf("%s [", nome);
+    for (int i = 0; i < lunghezza_barra; i++)
     {
-        unsigned short int attackRolls, defenseRolls;
-        unsigned short int playerHits = 0, inhabitantHits = 0;
-        unsigned short int playerDefends = 0, inhabitantDefends = 0;
-
-        if (playerTurn)
-        {
-            attackRolls = giocatori[currentPlayer].dadi_attacco;
-            defenseRolls = giocatori[currentPlayer].dadi_difesa;
-
-            for (int i = 0; i < attackRolls; i++)
-            {
-                unsigned short int roll = srandomNumberGenerator(1, 6);
-                if (roll <= 3)
-                    playerHits++;
-            }
-
-            for (int i = 0; i < defenseRolls; i++)
-            {
-                unsigned short int roll = srandomNumberGenerator(1, 6);
-                if (roll == 6)
-                    playerDefends++;
-            }
-
-            printf("Il giocatore ha colpito %hu volte e parato %hu volte.\n", playerHits, playerDefends);
-
-            if (playerHits > inhabitantDefends)
-            {
-                inhabitantRoll -= (playerHits - inhabitantDefends);
-                printf("L'abitante ha perso %hu punti vita.\n", playerHits - inhabitantDefends);
-            }
-        }
+        if (i < lunghezza_vita)
+            printf("\033[0;32m#\033[0m");
         else
+            printf(" "); // Parte della barra vuota
+    }
+    printf("] %d/%d\n", vita_attuale, vita_massima);
+}
+
+static bool getIfAllPlayersDead()
+{
+    for (int i = 0; i < playersNumber; i++)
+    {
+        if (giocatori[i].p_vita > 0)
         {
-            attackRolls = 2; // Assuming inhabitant has 2 attack dice
-            defenseRolls = 2; // Assuming inhabitant has 2 defense dice
+            return false;
+            break;
+        }
+    }
+    return true;
+}
 
-            for (int i = 0; i < attackRolls; i++)
+static void setDeadPlayer()
+{
+    char message[100];
+    sprintf(message, "\n%s e' MORTO! Non puo piu partecipare al gioco!", giocatori[actualTurn].nome_giocatore);
+    printGameEvent(message, RED);
+    playersDead[actualTurn] = true;
+
+    if (getIfAllPlayersDead())
+    {
+        printGameEvent("Tutti i giocatori sono morti. Il gioco e' finito!", RED);
+        termina_gioco();
+    }
+}
+
+// Funzione per lanciare il dado (animazione di lancio)
+int lanciaDado()
+{
+    int result;
+    printf("Lancio del dado...\n");
+#ifdef _WIN32
+    Sleep(500);
+#else
+    sleep(1);
+#endif
+    result = (rand() % 6) + 1; // Dado a 6 facce
+    printf("Il dado ha mostrato: %d\n", result);
+    return result;
+}
+
+// Funzione di combattimento dinamico
+static bool combatti(Abitante_segrete *abitante)
+{
+    int choice;
+    bool skipCombattimento = false;
+    printCustomMenu(menuCombattimentoName, optionsMenuCombattimento, numOptionsCombattimento);
+    do
+    {
+        scanf("%d", &choice);
+        switch (choice)
+        {
+        case 1:
+            choice = -928;
+            continue;
+        case 2:
+            scappa();
+            return true;
+        case 3:
+            skipCombattimento = gioca_potere_speciale();
+            if (skipCombattimento)
             {
-                unsigned short int roll = srandomNumberGenerator(1, 6);
-                if (roll <= 3)
-                    inhabitantHits++;
-            }
 
-            for (int i = 0; i < defenseRolls; i++)
+                return true;
+            }
+            else
             {
-                unsigned short int roll = srandomNumberGenerator(1, 6);
-                if (roll == 5 || roll == 6)
-                    inhabitantDefends++;
+
+                choice = !skipCombattimento ? -928 : 3;
             }
+            break;
+        default:
+            printGameEvent("Scelta non valida.", RED);
+            break;
+        }
+    } while ((choice > 1 && choice < 3));
 
-            printf("L'abitante ha colpito %hu volte e parato %hu volte.\n", inhabitantHits, inhabitantDefends);
+    int scelta, teschiGiocatore, teschiAbitante, scudiGiocatore, scudiAbitante;
+    bool pozioneCurativa = false;
 
-            if (inhabitantHits > playerDefends)
+    // Visualizzazione iniziale delle vite
+    while (giocatori[actualTurn].p_vita > 0 && abitante->punti_vita > 0)
+    {
+        // Visualizzazione delle barre vita aggiornate all'inizio di ogni turno
+        printf("\n=== Stato del Combattimento ===\n");
+        visualizzaBarraVita("Giocatore", giocatori[actualTurn].p_vita, giocatori[actualTurn].punti_vita_max);
+        visualizzaBarraVita("Abitante", abitante->punti_vita, abitante->punti_vita_max);
+        printf("===============================\n");
+
+        // Turno del giocatore: Scelta dell'azione
+        printCustomMenu(menuAzioneName, optionsMenuAzione, numOptionsAzione);
+        clearInputBuffer();
+        scanf("%d", &scelta);
+        teschiGiocatore = 0;
+        scudiGiocatore = 0;
+
+        switch (scelta)
+        {
+        case 1: // Attacco del giocatore
+            printf("Hai scelto di attaccare!\n");
+            for (int i = 0; i < giocatori[actualTurn].dadi_attacco; i++)
             {
-                giocatori[currentPlayer].p_vita -= (inhabitantHits - playerDefends);
-                printf("Il giocatore ha perso %hu punti vita.\n", inhabitantHits - playerDefends);
+                int dado = lanciaDado();
+                if (dado <= 3)
+                    teschiGiocatore++; // 3 facce teschio
             }
+            printf("\nHai colpito %d volte!\n", teschiGiocatore);
+            break;
+
+        case 2: // Difesa del giocatore
+            printf("Hai scelto di difenderti!\n");
+            for (int i = 0; i < giocatori[actualTurn].dadi_difesa; i++)
+            {
+                int dado = lanciaDado();
+                if (dado == 5 || dado == 6)
+                    scudiGiocatore++; // Scudi bianchi
+            }
+            printf("\nHai parato %d colpi!\n", scudiGiocatore);
+            break;
+        case 3:
+            if (!pozioneCurativa)
+            {
+                giocatori[actualTurn].p_vita += 4;
+                pozioneCurativa = true;
+            }
+            printGameEvent("Hai ottenuto 4 punti vita aggiuntivi! Sfruttali a dovere!", GREEN);
+            break;
         }
 
-        if (giocatori[currentPlayer].p_vita <= 0)
+        // Turno dell'abitante
+        printf("\n>>> Turno dell'Abitante <<<\n");
+        teschiAbitante = 0;
+        scudiAbitante = 0;
+
+        for (int i = 0; i < abitante->dadi_attacco; i++)
         {
-            printf("Il giocatore è morto.\n");
+            int dado = lanciaDado();
+            if (dado <= 3)
+                teschiAbitante++; // 3 facce teschio
+        }
+        for (int i = 0; i < abitante->dadi_difesa; i++)
+        {
+            int dado = lanciaDado();
+            if (dado == 6)
+                scudiAbitante++; // Scudi neri
+        }
+
+        printf("\nL'abitante ha colpito %d volte e parato %d colpi!\n", teschiAbitante, scudiAbitante);
+        puts("\n");
+        // Calcolo danni
+        if (teschiGiocatore > scudiAbitante)
+        {
+            abitante->punti_vita -= (teschiGiocatore - scudiAbitante);
+            printf("L'abitante ha perso %d punti vita!\n", teschiGiocatore - scudiAbitante);
+        }
+        if (teschiAbitante > scudiGiocatore)
+        {
+            giocatori[actualTurn].p_vita -= (teschiAbitante - scudiGiocatore);
+            printf("Hai perso %d punti vita!\n", teschiAbitante - scudiGiocatore);
+        }
+
+        // Verifica della fine del combattimento
+        if (giocatori[actualTurn].p_vita <= 0)
+        {
+            printGameEvent("Hai perso il combattimento. Sei morto.", RED);
+            setDeadPlayer();
             return false;
         }
 
-        if (inhabitantRoll <= 0)
+        if (abitante->punti_vita <= 0)
         {
-            printf("L'abitante è morto.\n");
+            printGameEvent("L'abitante delle segrete  morto!", GREEN);
             return true;
         }
 
-        playerTurn = !playerTurn;
+#ifdef _WIN32
+        Sleep(1000);
+#else
+        sleep(1);
+#endif
     }
 
     return false;
 }
 
-void gioca_potere_speciale()
+static bool gioca_potere_speciale()
 {
     unsigned short int currentPlayer = actualTurn;
 
     if (giocatori[currentPlayer].potere_speciale > 0)
     {
         giocatori[currentPlayer].potere_speciale--;
-        printf("Hai usato il potere speciale per uccidere immediatamente l'abitante!\n");
+        printGameEvent("Hai usato il potere speciale per uccidere immediatamente l'abitante!", GREEN);
+        return true;
     }
     else
     {
-        printf("Non hai più poteri speciali disponibili.\n");
+        printCustomMenu(menuCombattimentoName, optionsMenuCombattimento, numOptionsCombattimento);
+        printGameEvent("Non hai piu' poteri speciali disponibili. Devi continuare il combattimento!", RED);
+        return false;
     }
 }
 
 void gioca()
 {
-    if (!mappaCreata)
+    if (!isGameInitialized)
     {
-        printf("La mappa non è stata creata. Impossibile iniziare il gioco.\n");
+        printGameEvent("La mappa non e' stata creata. Impossibile iniziare il gioco.", RED);
         return;
     }
 
-    for (int i = 0; i < playersNumber; i++) {
+    for (int i = 0; i < playersNumber; i++)
+    {
         playersCurrentZone[i] = firstZonaSegreta;
     }
 
     selectTurn();
-    avanza();
+}
+
+void termina_gioco()
+{
+    // Banner di fine gioco con asterischi
+    printGameEvent("**************************************************", GREEN);
+    printGameEvent("*                                                *", GREEN);
+    printGameEvent("*     Il gioco e' terminato!                      *", GREEN);
+    printGameEvent("*     Grazie per aver giocato a Scalogna-Quest!  *", GREEN);
+    printGameEvent("*                                                *", GREEN);
+    printGameEvent("**************************************************", GREEN);
+
+    if (gameWinner)
+    {
+        // Larghezza totale del riquadro
+        int width = 50;
+        // Lunghezza del testo "VINCITORE"
+        int titleLength = strlen("VINCITORE");
+        // Calcola il padding per centrare il titolo
+        int titlePadding = (width - titleLength) / 2;
+
+        // Stampa la sezione del vincitore con trattini
+        printGameEvent("\n", RESET);
+        printGameEvent("--------------------------------------------------", YELLOW);
+
+        // Crea e stampa il titolo centrato
+        char title[100];
+        sprintf(title, "%*sVINCITORE%*s", titlePadding, "", titlePadding, "");
+        printGameEvent(title, YELLOW);
+
+        printGameEvent("--------------------------------------------------", YELLOW);
+
+        // Calcola il padding per centrare il nome del vincitore
+        int nameLength = strlen(giocatori[actualTurn].nome_giocatore);
+        int namePadding = (width - nameLength) / 2;
+
+        // Assicura che il padding sia almeno zero
+        if (namePadding < 0)
+            namePadding = 0;
+
+        // Crea e stampa il nome del vincitore centrato
+        char winnerMessage[100];
+        sprintf(winnerMessage, "%*s%s%*s", namePadding, "", giocatori[actualTurn].nome_giocatore, namePadding, "");
+        printGameEvent(winnerMessage, CYAN);
+
+        printGameEvent("--------------------------------------------------", YELLOW);
+    }
+    return;
 }
