@@ -1086,6 +1086,7 @@ static void avanza()
     if (playersCurrentZone[currentPlayer] == lastZonaSegreta)
     {
         printGameEvent("Hai raggiunto l'ultima stanza delle segrete! Complimenti!", GREEN);
+        gameWinner = &giocatori[currentPlayer];
         termina_gioco();
         return;
     }
@@ -1594,4 +1595,5 @@ void termina_gioco()
 
         printGameEvent("--------------------------------------------------", YELLOW);
     }
+    return;
 }
