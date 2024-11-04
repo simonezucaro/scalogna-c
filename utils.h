@@ -26,3 +26,5 @@ typedef enum {
     RESET
 } Color;
 void printGameEvent(const char* str, Color color);
+void printChar(char c, char righe[][200], int larghezza);
+void printString(const char *str);

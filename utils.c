@@ -191,3 +191,156 @@ void clearInputBuffer()
     fflush(stdin);
 #endif
 }
+
+void printChar(char c, char righe[][200], int larghezza)
+{
+    switch (c)
+    {
+    case 'S':
+    case 's':
+        strcpy(righe[0] + larghezza, "   0000000   ");
+        strcpy(righe[1] + larghezza, "  00      00 ");
+        strcpy(righe[2] + larghezza, " 00           ");
+        strcpy(righe[3] + larghezza, "  0000000     ");
+        strcpy(righe[4] + larghezza, "         00  ");
+        strcpy(righe[5] + larghezza, "  00      00 ");
+        strcpy(righe[6] + larghezza, "   0000000   ");
+        break;
+
+    case 'C':
+    case 'c':
+        strcpy(righe[0] + larghezza, "   0000000   ");
+        strcpy(righe[1] + larghezza, "  00      00 ");
+        strcpy(righe[2] + larghezza, " 00          ");
+        strcpy(righe[3] + larghezza, " 00          ");
+        strcpy(righe[4] + larghezza, " 00          ");
+        strcpy(righe[5] + larghezza, "  00      00 ");
+        strcpy(righe[6] + larghezza, "   0000000   ");
+        break;
+
+    case 'A':
+    case 'a':
+        strcpy(righe[0] + larghezza, "     0000    ");
+        strcpy(righe[1] + larghezza, "    00  00   ");
+        strcpy(righe[2] + larghezza, "   00    00  ");
+        strcpy(righe[3] + larghezza, "  0000000000 ");
+        strcpy(righe[4] + larghezza, " 00        00");
+        strcpy(righe[5] + larghezza, "00          00");
+        strcpy(righe[6] + larghezza, "00          00");
+        break;
+
+    case 'L':
+    case 'l':
+        strcpy(righe[0] + larghezza, "00           ");
+        strcpy(righe[1] + larghezza, "00           ");
+        strcpy(righe[2] + larghezza, "00           ");
+        strcpy(righe[3] + larghezza, "00           ");
+        strcpy(righe[4] + larghezza, "00           ");
+        strcpy(righe[5] + larghezza, "00           ");
+        strcpy(righe[6] + larghezza, " 0000000000  ");
+        break;
+
+    case 'O':
+    case 'o':
+        strcpy(righe[0] + larghezza, "   0000000   ");
+        strcpy(righe[1] + larghezza, "  00      00 ");
+        strcpy(righe[2] + larghezza, " 00        00");
+        strcpy(righe[3] + larghezza, " 00        00");
+        strcpy(righe[4] + larghezza, " 00        00");
+        strcpy(righe[5] + larghezza, "  00      00 ");
+        strcpy(righe[6] + larghezza, "   0000000   ");
+        break;
+
+    case 'G':
+    case 'g':
+        strcpy(righe[0] + larghezza, "   0000000   ");
+        strcpy(righe[1] + larghezza, "  00      00 ");
+        strcpy(righe[2] + larghezza, " 00          ");
+        strcpy(righe[3] + larghezza, " 00    00000 ");
+        strcpy(righe[4] + larghezza, " 00       00 ");
+        strcpy(righe[5] + larghezza, "  00      00 ");
+        strcpy(righe[6] + larghezza, "   0000000   ");
+        break;
+
+    case 'N':
+    case 'n':
+        strcpy(righe[0] + larghezza, "00         00");
+        strcpy(righe[1] + larghezza, "0000       00");
+        strcpy(righe[2] + larghezza, "00  00     00");
+        strcpy(righe[3] + larghezza, "00   00    00");
+        strcpy(righe[4] + larghezza, "00    00   00");
+        strcpy(righe[5] + larghezza, "00      00 00");
+        strcpy(righe[6] + larghezza, "00       0000");
+        break;
+
+    case 'Q':
+    case 'q':
+        strcpy(righe[0] + larghezza, "   0000000   ");
+        strcpy(righe[1] + larghezza, "  00      00 ");
+        strcpy(righe[2] + larghezza, " 00        00");
+        strcpy(righe[3] + larghezza, " 00    00  00");
+        strcpy(righe[4] + larghezza, " 00      00  ");
+        strcpy(righe[5] + larghezza, "  00     000 ");
+        strcpy(righe[6] + larghezza, "   0000000  00");
+        break;
+
+    case 'U':
+    case 'u':
+        strcpy(righe[0] + larghezza, "00          00");
+        strcpy(righe[1] + larghezza, "00          00");
+        strcpy(righe[2] + larghezza, "00          00");
+        strcpy(righe[3] + larghezza, "00          00");
+        strcpy(righe[4] + larghezza, "00          00");
+        strcpy(righe[5] + larghezza, " 00        00 ");
+        strcpy(righe[6] + larghezza, "   0000000    ");
+        break;
+
+    case 'E':
+    case 'e':
+        strcpy(righe[0] + larghezza, " 0000000000  ");
+        strcpy(righe[1] + larghezza, "00           ");
+        strcpy(righe[2] + larghezza, "00           ");
+        strcpy(righe[3] + larghezza, "000000000    ");
+        strcpy(righe[4] + larghezza, "00           ");
+        strcpy(righe[5] + larghezza, "00           ");
+        strcpy(righe[6] + larghezza, " 0000000000  ");
+        break;
+
+    case 'T':
+    case 't':
+        strcpy(righe[0] + larghezza, "000000000000 ");
+        strcpy(righe[1] + larghezza, "     00      ");
+        strcpy(righe[2] + larghezza, "     00      ");
+        strcpy(righe[3] + larghezza, "     00      ");
+        strcpy(righe[4] + larghezza, "     00      ");
+        strcpy(righe[5] + larghezza, "     00      ");
+        strcpy(righe[6] + larghezza, "     00      ");
+        break;
+
+    default:
+        for (int i = 0; i < 7; i++)
+        {
+            strcpy(righe[i] + larghezza, "            ");
+        }
+        break;
+    }
+}
+
+void printString(const char *str)
+{
+    char righe[7][200] = {{0}}; // Buffer per contenere tutte le lettere in una singola riga orizzontale
+    int larghezza = 0;
+
+    // Itera su ogni carattere della stringa e aggiungi le sue "righe" al buffer
+    for (int i = 0; i < strlen(str); i++)
+    {
+        printChar(str[i], righe, larghezza);
+        larghezza += 13; // Spaziatura tra i caratteri
+    }
+
+    // Stampa ogni riga
+    for (int i = 0; i < 7; i++)
+    {
+        printf("%s\n", righe[i]);
+    }
+}

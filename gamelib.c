@@ -901,37 +901,37 @@ static const char *tipo_zona_to_string(enum tipo_zona zona)
     }
 }
 
-static const char *tipo_tesoro_to_string(enum tipo_tesoro tesoro)
-{
-    switch (tesoro)
-    {
-    case nessun_tesoro:
-        return "nessun_tesoro";
-    case veleno:
-        return "veleno";
-    case guarigione:
-        return "guarigione";
-    case doppia_guarigione:
-        return "doppia_guarigione";
-    default:
-        return "unknown";
-    }
-}
+// static const char *tipo_tesoro_to_string(enum tipo_tesoro tesoro)
+// {
+//     switch (tesoro)
+//     {
+//     case nessun_tesoro:
+//         return "nessun_tesoro";
+//     case veleno:
+//         return "veleno";
+//     case guarigione:
+//         return "guarigione";
+//     case doppia_guarigione:
+//         return "doppia_guarigione";
+//     default:
+//         return "unknown";
+//     }
+// }
 
-static const char *tipo_porta_to_string(enum tipo_porta porta)
-{
-    switch (porta)
-    {
-    case nessuna_porta:
-        return "nessuna_porta";
-    case porta_normale:
-        return "porta_normale";
-    case porta_da_scassinare:
-        return "porta_da_scassinare";
-    default:
-        return "unknown";
-    }
-}
+// static const char *tipo_porta_to_string(enum tipo_porta porta)
+// {
+//     switch (porta)
+//     {
+//     case nessuna_porta:
+//         return "nessuna_porta";
+//     case porta_normale:
+//         return "porta_normale";
+//     case porta_da_scassinare:
+//         return "porta_da_scassinare";
+//     default:
+//         return "unknown";
+//     }
+// }
 
 static const char *classe_to_string(enum classe_giocatore classe) {
     switch(classe) {
@@ -955,24 +955,58 @@ static const char *classe_to_string(enum classe_giocatore classe) {
  * of each zone, including its type, treasure type, door type, and pointers to the previous
  * and next zones. The function prints a separator between each zone for clarity.
  */
-static void stampa_mappa()
-{
+// static void stampa_mappa()
+// {
+//     Zona_segrete *current = firstZonaSegreta;
+//     int zoneCount = 1;
+//     printf("\n==================== MAPPA DEL GIOCO ====================\n");
+//     while (current != NULL)
+//     {
+//         printf("Zona %d:\n", zoneCount++);
+//         printf("----------------------------------------\n");
+//         // printf("- Indirizzo Zona Attuale: %p\n", (void *)current);
+//         printf("- Tipo Zona: %s\n", tipo_zona_to_string(current->tipoZona));
+//         printf("- Tipo Tesoro: %s\n", tipo_tesoro_to_string(current->tipoTesoro));
+//         printf("- Tipo Porta: %s\n", tipo_porta_to_string(current->tipoPorta));
+//         // printf("- Zona Precedente: %p\n", (void *)current->zona_precedente);
+//         // printf("- Zona Successiva: %p\n", (void *)current->zona_successiva);
+//         printf("----------------------------------------\n");
+//         current = current->zona_successiva;
+//     }
+//     printf("========================================================\n");
+// }
+
+static void stampa_mappa() {
     Zona_segrete *current = firstZonaSegreta;
     int zoneCount = 1;
     printf("\n==================== MAPPA DEL GIOCO ====================\n");
-    while (current != NULL)
-    {
-        printf("Zona %d:\n", zoneCount++);
-        printf("----------------------------------------\n");
-        // printf("- Indirizzo Zona Attuale: %p\n", (void *)current);
-        printf("- Tipo Zona: %s\n", tipo_zona_to_string(current->tipoZona));
-        printf("- Tipo Tesoro: %s\n", tipo_tesoro_to_string(current->tipoTesoro));
-        printf("- Tipo Porta: %s\n", tipo_porta_to_string(current->tipoPorta));
-        // printf("- Zona Precedente: %p\n", (void *)current->zona_precedente);
-        // printf("- Zona Successiva: %p\n", (void *)current->zona_successiva);
-        printf("----------------------------------------\n");
+
+    while (current != NULL) {
+        if (current == playersCurrentZone[actualTurn]) {
+            printf("| x ");
+        } else {
+            printf("|   ");
+        }
         current = current->zona_successiva;
+        if (zoneCount % 5 == 0) { // Aggiungi una nuova riga ogni 5 zone
+            printf("|\n");
+            for (int j = 0; j < 5; j++) {
+                printf("----");
+            }
+            printf("-\n");
+        }
+        zoneCount++;
     }
+
+    // Chiudi l'ultima riga se non è stata chiusa
+    if ((zoneCount - 1) % 5 != 0) {
+        printf("|\n");
+        for (int j = 0; j < (zoneCount - 1) % 5; j++) {
+            printf("----");
+        }
+        printf("-\n");
+    }
+
     printf("========================================================\n");
 }
 
@@ -1198,6 +1232,8 @@ static void selectTurn()
     turnsArray[turn] = true;
     actualTurn = turn;
     printCustomMenu(menuGiocatoreName, optionsMenuGiocatore, numOptionsGiocatore);
+    stampa_mappa();
+    visualizzaBarraVita(giocatori[actualTurn].nome_giocatore, giocatori[actualTurn].p_vita, giocatori[actualTurn].punti_vita_max);
     char eventMessage[100];
     snprintf(eventMessage, sizeof(eventMessage), "%s e' il tuo turno!", giocatori[turn].nome_giocatore);
     printGameEvent(eventMessage, BLUE);
@@ -1704,7 +1740,7 @@ static bool combatti(Abitante_segrete *abitante)
         sleep(1);
 #endif
     }
-
+    free(abitante);
     return false;
 }
 
@@ -1747,10 +1783,10 @@ void gioca()
 {
     if (!isGameInitialized)
     {
-        printGameEvent("La partita non è stata impsotata. Impossibile iniziare il gioco!", RED);
+        printGameEvent("La partita non e' stata impostata. Impossibile iniziare il gioco!", RED);
         return;
     }
-
+    printGameEvent("La partita sta per iniziare! Che vinca il migliore!",  MAGENTA);
     for (int i = 0; i < playersNumber; i++)
     {
         playersCurrentZone[i] = firstZonaSegreta;
@@ -1817,5 +1853,6 @@ void termina_gioco()
 
         printGameEvent("--------------------------------------------------", YELLOW);
     }
+    resetGame();
     return;
 }

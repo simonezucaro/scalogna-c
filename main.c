@@ -9,6 +9,8 @@ int numOptions = sizeof(options) / sizeof(options[0]);
 
 int main()
 {
+    printString("SCALOGNA");
+    printString("QUEST");
 
     int choice = 0;
     void (*f[3])() = {imposta_gioco, gioca, termina_gioco};
