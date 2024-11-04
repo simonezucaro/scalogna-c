@@ -188,6 +188,6 @@ void clearInputBuffer()
     while (getchar() != '\n')
         ;
 #else
-    tcflush(STDIN_FILENO, TCIFLUSH);
+    fflush(stdin);
 #endif
 }

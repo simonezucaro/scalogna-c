@@ -1090,7 +1090,8 @@ static void avanza()
         combatti(abitante);
     }
 
-        if(playersCurrentZone[currentPlayer] == lastZonaSegreta) {
+    if (playersCurrentZone[currentPlayer] == lastZonaSegreta)
+    {
         printGameEvent("Hai raggiunto l'ultima stanza delle segrete! Complimenti!", GREEN);
         termina_gioco();
         return;
@@ -1126,7 +1127,7 @@ static void stampa_giocatore()
 
     printf("\n==================== GIOCATORE ====================\n");
     printf("Nome Giocatore: %s\n", player->nome_giocatore);
-    printf("Classe: %s\n", player->classe);
+    printf("Classe: %d\n", player->classe);
     printf("Punti Vita: %d\n", player->p_vita);
     printf("Punti Mente: %d\n", player->mente);
     printf("Dadi Attacco: %d\n", player->dadi_attacco);
@@ -1432,8 +1433,10 @@ static bool combatti(Abitante_segrete *abitante)
             {
                 giocatori[actualTurn].p_vita += 4;
                 pozioneCurativa = true;
-            }
             printGameEvent("Hai ottenuto 4 punti vita aggiuntivi! Sfruttali a dovere!", GREEN);
+            } else {
+                printGameEvent("Hai gia' usato la pozione curativa. Non puoi usarne un'altra!", RED);
+            }
             break;
         }
 
@@ -1460,12 +1463,26 @@ static bool combatti(Abitante_segrete *abitante)
         // Calcolo danni
         if (teschiGiocatore > scudiAbitante)
         {
-            abitante->punti_vita -= (teschiGiocatore - scudiAbitante);
+            if (abitante->punti_vita - (teschiGiocatore - scudiAbitante) <= 0)
+            {
+                abitante->punti_vita = 0;
+            }
+            else
+            {
+                abitante->punti_vita -= (teschiGiocatore - scudiAbitante);
+            }
             printf("L'abitante ha perso %d punti vita!\n", teschiGiocatore - scudiAbitante);
         }
         if (teschiAbitante > scudiGiocatore)
         {
-            giocatori[actualTurn].p_vita -= (teschiAbitante - scudiGiocatore);
+            if (giocatori[actualTurn].p_vita - (teschiAbitante - scudiGiocatore) <= 0)
+            {
+                giocatori[actualTurn].p_vita = 0;
+            }
+            else
+            {
+                giocatori[actualTurn].p_vita -= (teschiAbitante - scudiGiocatore);
+            }
             printf("Hai perso %d punti vita!\n", teschiAbitante - scudiGiocatore);
         }
 
