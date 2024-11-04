@@ -31,7 +31,7 @@ static bool getAllPlayersPlayed();
 
 // Players
 static int srandomNumberGenerator(int min, int max);
-static void getPlayersNumber(short int *playersNumber);
+static void getPlayersNumber();
 static void initPlayers();
 static Giocatore *setGameMaster();
 
@@ -265,7 +265,6 @@ static void visualizzaBarraVita(char *nome, int vita_attuale, int vita_massima)
     printf("] %d/%d\n", vita_attuale, vita_massima);
 }
 
-
 /**
  * @brief Sets the current player as dead and checks if all players are dead.
  *
@@ -277,14 +276,14 @@ static void visualizzaBarraVita(char *nome, int vita_attuale, int vita_massima)
  */
 static void setDeadPlayer()
 {
+    playersDead[actualTurn] = true;
     char message[100];
     sprintf(message, "\n%s e' MORTO! Non puo piu partecipare al gioco!", giocatori[actualTurn].nome_giocatore);
     printGameEvent(message, RED);
-    playersDead[actualTurn] = true;
 
     if (getIfAllPlayersDead())
     {
-        printGameEvent("Tutti i giocatori sono morti. Il gioco e' finito!", RED);
+        // printGameEvent("Tutti i giocatori sono morti. Il gioco e' finito!", RED);
         termina_gioco();
         return;
     }
@@ -326,7 +325,7 @@ static bool getIfAllPlayersDead()
 {
     for (int i = 0; i < playersNumber; i++)
     {
-        if (giocatori[i].p_vita > 0)
+        if (!playersDead[i])
         {
             return false;
         }
@@ -374,7 +373,7 @@ void imposta_gioco()
     clearScreen();
     printCustomHeader("CREAZIONE GIOCATORI");
 
-    getPlayersNumber(&playersNumber);
+    getPlayersNumber();
     turnsArray = (bool *)calloc(playersNumber, sizeof(int));
     playersDead = (bool *)calloc(playersNumber, sizeof(int));
     for (int i = 0; i < playersNumber; i++)
@@ -430,7 +429,6 @@ void imposta_gioco()
     printMenuMappa();
 }
 
-
 // Players initialization
 
 /**
@@ -458,17 +456,17 @@ static int srandomNumberGenerator(int min, int max)
  * MIN_PLAYER and MAX_PLAYER. The input is read as a short integer and stored in the variable
  * pointed to by the parameter `playersNumber`.
  *
- * @param playersNumber Pointer to a short integer where the number of players will be stored.
  */
-static void getPlayersNumber(short int *playersNumber)
+static void getPlayersNumber()
 {
     do
     {
         printf("\nInserisci il numero di giocatori (min 1, max 4): ");
-        scanf("%hd", playersNumber);
+        scanf("%hd", &playersNumber);
         while ((getchar()) != '\n')
             ;
-    } while (*playersNumber < MIN_PLAYER || *playersNumber > MAX_PLAYER);
+    } while (playersNumber < MIN_PLAYER || playersNumber > MAX_PLAYER);
+    printf("%d", playersNumber);
 }
 
 /**
@@ -933,17 +931,19 @@ static const char *tipo_zona_to_string(enum tipo_zona zona)
 //     }
 // }
 
-static const char *classe_to_string(enum classe_giocatore classe) {
-    switch(classe) {
-        case barbaro:
+static const char *classe_to_string(enum classe_giocatore classe)
+{
+    switch (classe)
+    {
+    case barbaro:
         return "barbaro";
-        case nano:
+    case nano:
         return "nano";
-        case elfo:
+    case elfo:
         return "elfo";
-        case mago:
+    case mago:
         return "mago";
-        default:
+    default:
         return "unknown";
     }
 }
@@ -976,21 +976,28 @@ static const char *classe_to_string(enum classe_giocatore classe) {
 //     printf("========================================================\n");
 // }
 
-static void stampa_mappa() {
+static void stampa_mappa()
+{
     Zona_segrete *current = firstZonaSegreta;
     int zoneCount = 1;
     printf("\n==================== MAPPA DEL GIOCO ====================\n");
 
-    while (current != NULL) {
-        if (current == playersCurrentZone[actualTurn]) {
+    while (current != NULL)
+    {
+        if (current == playersCurrentZone[actualTurn])
+        {
             printf("| x ");
-        } else {
+        }
+        else
+        {
             printf("|   ");
         }
         current = current->zona_successiva;
-        if (zoneCount % 5 == 0) { // Aggiungi una nuova riga ogni 5 zone
+        if (zoneCount % 5 == 0)
+        { // Aggiungi una nuova riga ogni 5 zone
             printf("|\n");
-            for (int j = 0; j < 5; j++) {
+            for (int j = 0; j < 5; j++)
+            {
                 printf("----");
             }
             printf("-\n");
@@ -999,9 +1006,11 @@ static void stampa_mappa() {
     }
 
     // Chiudi l'ultima riga se non è stata chiusa
-    if ((zoneCount - 1) % 5 != 0) {
+    if ((zoneCount - 1) % 5 != 0)
+    {
         printf("|\n");
-        for (int j = 0; j < (zoneCount - 1) % 5; j++) {
+        for (int j = 0; j < (zoneCount - 1) % 5; j++)
+        {
             printf("----");
         }
         printf("-\n");
@@ -1111,7 +1120,7 @@ static void printMenuMappa()
  * The player can choose from several options, such as advancing, moving back,
  * printing player information, printing zone information, taking a treasure, or passing the turn.
  * The function ensures that the input is a valid integer and handles invalid choices appropriately.
- * 
+ *
  * The available choices are:
  * - 1: Advance (avanza)
  * - 2: Move back (indietreggia)
@@ -1124,9 +1133,9 @@ static void printMenuMappa()
  * If the player chooses to advance or take a treasure, the turn is passed.
  * If the player chooses to move back, print player information, or print zone information,
  * the menu is displayed again after performing the action.
- * 
+ *
  * If an invalid choice is made, an error message is displayed and the player is prompted again.
- * 
+ *
  * @note This function uses several helper functions:
  * - printGameEvent: Displays a game event message.
  * - clearInputBuffer: Clears the input buffer.
@@ -1188,9 +1197,10 @@ static void printMenuGiocatore()
         }
     } while (!passTurn || choice == -1);
     if (passTurn)
+    {
         selectTurn();
+    }
 }
-
 
 /**
  * @brief Selects the next player's turn randomly.
@@ -1209,7 +1219,8 @@ static void printMenuGiocatore()
  */
 static void selectTurn()
 {
-    if(getIfAllPlayersDead() || gameWinner != NULL) return; 
+    if (getIfAllPlayersDead() || gameWinner != NULL)
+        return;
     unsigned short int turn = srandomNumberGenerator(0, playersNumber - 1);
     bool allPlayersPlayed = getAllPlayersPlayed();
 
@@ -1220,7 +1231,10 @@ static void selectTurn()
         {
             turnsArray[i] = false;
         }
-        turn = srandomNumberGenerator(0, playersNumber - 1);
+        while (turnsArray[turn] || playersDead[turn])
+        {
+            turn = srandomNumberGenerator(0, playersNumber - 1);
+        }
     }
     else
     {
@@ -1461,10 +1475,8 @@ static bool apri_porta(enum tipo_porta tipoPorta)
         printGameEvent("Non e' presente nessuna porta in questa stanza! Sei avanzato nella zona successiva!", GREEN);
         return true;
     }
-    {
-        printGameEvent("Hai aperto la porta e sei avanzato nella zona successiva!", GREEN);
-        return true;
-    }
+    printGameEvent("Hai aperto la porta con successo!", GREEN);
+    return true;
 }
 
 /**
@@ -1570,7 +1582,6 @@ static void scappa()
         }
     }
 }
-
 
 /**
  * @brief Executes a dynamic combat sequence between the player and a dungeon inhabitant.
@@ -1776,7 +1787,7 @@ static bool gioca_potere_speciale()
  * @brief Starts the game if it has been initialized.
  *
  * This function checks if the game has been initialized. If not, it prints an error message
- * and returns. If the game is initialized, it sets the current zone of each player to the 
+ * and returns. If the game is initialized, it sets the current zone of each player to the
  * first secret zone and then selects the turn.
  */
 void gioca()
@@ -1786,30 +1797,30 @@ void gioca()
         printGameEvent("La partita non e' stata impostata. Impossibile iniziare il gioco!", RED);
         return;
     }
-    printGameEvent("La partita sta per iniziare! Che vinca il migliore!",  MAGENTA);
+    printGameEvent("La partita sta per iniziare! Che vinca il migliore!", MAGENTA);
     for (int i = 0; i < playersNumber; i++)
     {
         playersCurrentZone[i] = firstZonaSegreta;
     }
-    
+
     selectTurn();
 }
 
 /**
  * @brief Terminates the game and displays the end game banner and winner information.
- * 
+ *
  * This function sets the game state to uninitialized and prints a banner indicating the end of the game.
  * If there is a winner, it also prints a centered title "VINCITORE" and the winner's name.
- * 
+ *
  * The banner and winner information are displayed with specific colors.
- * 
- * @note This function assumes that `isGameInitialized`, `gameWinner`, `giocatori`, and `actualTurn` are 
+ *
+ * @note This function assumes that `isGameInitialized`, `gameWinner`, `giocatori`, and `actualTurn` are
  *       defined and accessible within the scope of this function.
  */
 void termina_gioco()
 {
     isGameInitialized = false;
-    
+
     // Banner di fine gioco con asterischi
     printGameEvent("**************************************************", GREEN);
     printGameEvent("*                                                *", GREEN);
