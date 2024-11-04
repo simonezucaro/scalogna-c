@@ -1083,18 +1083,18 @@ static void avanza()
 
     playersCurrentZone[currentPlayer] = currentZone->zona_successiva;
 
-    double probability[3] = {0.33, 0.67, 0.0}; // 33% probability for the first element
-    if (getNumberByProbability(probability, 3) == 0 || playersCurrentZone[currentPlayer]->zona_successiva == NULL)
-    {
-        Abitante_segrete *abitante = figureAbitanteSegrete();
-        combatti(abitante);
-    }
-
     if (playersCurrentZone[currentPlayer] == lastZonaSegreta)
     {
         printGameEvent("Hai raggiunto l'ultima stanza delle segrete! Complimenti!", GREEN);
         termina_gioco();
         return;
+    }
+
+    double probability[3] = {0.33, 0.67, 0.0}; // 33% probability for the first element
+    if (getNumberByProbability(probability, 3) == 0 || playersCurrentZone[currentPlayer]->zona_successiva == NULL)
+    {
+        Abitante_segrete *abitante = figureAbitanteSegrete();
+        combatti(abitante);
     }
 }
 
@@ -1332,6 +1332,7 @@ static void setDeadPlayer()
     {
         printGameEvent("Tutti i giocatori sono morti. Il gioco e' finito!", RED);
         termina_gioco();
+        return;
     }
 }
 
@@ -1433,8 +1434,10 @@ static bool combatti(Abitante_segrete *abitante)
             {
                 giocatori[actualTurn].p_vita += 4;
                 pozioneCurativa = true;
-            printGameEvent("Hai ottenuto 4 punti vita aggiuntivi! Sfruttali a dovere!", GREEN);
-            } else {
+                printGameEvent("Hai ottenuto 4 punti vita aggiuntivi! Sfruttali a dovere!", GREEN);
+            }
+            else
+            {
                 printGameEvent("Hai gia' usato la pozione curativa. Non puoi usarne un'altra!", RED);
             }
             break;
@@ -1589,5 +1592,4 @@ void termina_gioco()
 
         printGameEvent("--------------------------------------------------", YELLOW);
     }
-    return;
 }
