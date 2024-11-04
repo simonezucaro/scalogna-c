@@ -1549,6 +1549,8 @@ void gioca()
 
 void termina_gioco()
 {
+    isGameInitialized = false;
+    
     // Banner di fine gioco con asterischi
     printGameEvent("**************************************************", GREEN);
     printGameEvent("*                                                *", GREEN);
