@@ -19,12 +19,15 @@ Giocatore *gameWinner = NULL;
 
 // Utils
 static void resetGame();
-static int getNumberByProbability(const double probability[], int numElements);
 static int diceThrow(int min, int max, char *message, bool abitante);
 static Abitante_segrete *figureAbitanteSegrete();
+static int getNumberByProbability(const double probability[], int numElements);
 static void regenerateZoneSegrete();
 static void visualizzaBarraVita(char *nome, int vita_attuale, int vita_massima);
 static void setDeadPlayer();
+static int lanciaDado();
+static bool getIfAllPlayersDead();
+static bool getAllPlayersPlayed();
 
 // Players
 static int srandomNumberGenerator(int min, int max);
@@ -43,7 +46,6 @@ static void chiudi_mappa();
 static void printMenuMappa();
 
 // Game
-static bool getAllPlayersPlayed();
 static void printMenuGiocatore();
 static void selectTurn();
 // static void passTurn();
@@ -94,132 +96,7 @@ const char *optionsMenuAzione[] = {
     "Curati"};
 int numOptionsAzione = sizeof(optionsMenuAzione) / sizeof(optionsMenuAzione[0]);
 
-/**
- * @brief Sets up the game environment.
- *
- * This function initializes the game by performing the following steps:
- * 1. Retrieves the number of players and allocates memory for player structures.
- * 2. Initializes each player with a name, class, and attributes.
- * 3. Selects one player to be the Game Master and announces it.
- * 4. Generates the game map with secret zones.
- * 5. Prints details of all secret zones including their type, treasure type, door type,
- *    and pointers to previous and next zones.
- *
- * If memory allocation for players fails, the function prints an error message and exits the program.
- */
-void imposta_gioco()
-{
-    resetGame();
-    clearScreen();
-    printCustomHeader("CREAZIONE GIOCATORI");
-
-    getPlayersNumber(&playersNumber);
-    turnsArray = (bool *)calloc(playersNumber, sizeof(int));
-    playersDead = (bool *)calloc(playersNumber, sizeof(int));
-    for (int i = 0; i < playersNumber; i++)
-    {
-        turnsArray[i] = false;
-        playersDead[i] = false;
-    }
-    playersCurrentZone = (Zona_segrete **)calloc(playersNumber, sizeof(Zona_segrete *));
-
-    if (turnsArray == NULL)
-    {
-        fprintf(stderr, "Errore nell'allocazione della memoria per l'array dei turni :/\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (playersDead == NULL)
-    {
-        fprintf(stderr, "Errore nell'allocazione della memoria per l'array dei giocatori morti :/\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (playersCurrentZone == NULL)
-    {
-        fprintf(stderr, "Errore nell'allocazione della memoria per l'array delle zone dei giocatori :/\n");
-        exit(EXIT_FAILURE);
-    }
-
-    for (int i = 0; i < playersNumber; i++)
-    {
-        turnsArray[i] = false;
-    }
-
-    // Get the players' names, assign them a class, and initialize their attributes
-    giocatori = (Giocatore *)calloc(playersNumber, sizeof(Giocatore));
-    if (giocatori == NULL)
-    {
-        fprintf(stderr, "Errore nella creazione dei giocatori :/\n");
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-        initPlayers();
-    }
-
-    clearScreen();
-    gameMaster = setGameMaster();
-    char message[100];
-    sprintf(message, "\n%s e' evoluto a Game Master! E' arrivato il momento di creare la mappa di gioco!", gameMaster->nome_giocatore);
-    printGameEvent(message, BLUE);
-
-    // ######################## MAP ########################
-    printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
-    printMenuMappa();
-}
-
-/**
- * @brief Selects an index based on a given probability distribution.
- *
- * This function takes an array of probabilities and the number of elements in the array,
- * and returns an index based on the probability distribution. The sum of the probabilities
- * must be approximately 1.0.
- *
- * @param probability An array of probabilities.
- * @param numElements The number of elements in the probability array.
- * @return The selected index based on the probability distribution.
- */
-static int getNumberByProbability(const double probability[], int numElements)
-{
-    // Calculate the sum of probabilities to ensure it is approximately 1.0
-    double sumProbability = 0.0;
-    for (int i = 0; i < numElements; i++)
-    {
-        sumProbability += probability[i];
-    }
-
-    // Verify that the sum of probabilities is close to 1.0
-    if (sumProbability < 0.9999 || sumProbability > 1.0001)
-    {
-        fprintf(stderr, "Error: The sum of probabilities must be 1.0 (current: %f)\n", sumProbability);
-        exit(EXIT_FAILURE);
-    }
-
-    // Create the cumulative distribution
-    double cumulativeDistribution[numElements];
-    cumulativeDistribution[0] = probability[0];
-    for (int i = 1; i < numElements; i++)
-    {
-        cumulativeDistribution[i] = cumulativeDistribution[i - 1] + probability[i];
-    }
-
-    // Generate a random number between 0 and 1
-    double randomFraction = rand() / (RAND_MAX + 1.0);
-
-    // Find the corresponding index in the cumulative distribution
-    for (int i = 0; i < numElements; i++)
-    {
-        if (randomFraction < cumulativeDistribution[i])
-        {
-            return i;
-        }
-    }
-
-    // In case no index is found (due to rounding), return the last index
-    return numElements - 1;
-}
-
+// ##### UTILS ######
 /**
  * @brief Resets the game state by freeing allocated memory and resetting pointers.
  *
@@ -299,6 +176,57 @@ static Abitante_segrete *figureAbitanteSegrete()
     return abitante;
 }
 
+/**
+ * @brief Selects an index based on a given probability distribution.
+ *
+ * This function takes an array of probabilities and the number of elements in the array,
+ * and returns an index based on the probability distribution. The sum of the probabilities
+ * must be approximately 1.0.
+ *
+ * @param probability An array of probabilities.
+ * @param numElements The number of elements in the probability array.
+ * @return The selected index based on the probability distribution.
+ */
+static int getNumberByProbability(const double probability[], int numElements)
+{
+    // Calculate the sum of probabilities to ensure it is approximately 1.0
+    double sumProbability = 0.0;
+    for (int i = 0; i < numElements; i++)
+    {
+        sumProbability += probability[i];
+    }
+
+    // Verify that the sum of probabilities is close to 1.0
+    if (sumProbability < 0.9999 || sumProbability > 1.0001)
+    {
+        fprintf(stderr, "Error: The sum of probabilities must be 1.0 (current: %f)\n", sumProbability);
+        exit(EXIT_FAILURE);
+    }
+
+    // Create the cumulative distribution
+    double cumulativeDistribution[numElements];
+    cumulativeDistribution[0] = probability[0];
+    for (int i = 1; i < numElements; i++)
+    {
+        cumulativeDistribution[i] = cumulativeDistribution[i - 1] + probability[i];
+    }
+
+    // Generate a random number between 0 and 1
+    double randomFraction = rand() / (RAND_MAX + 1.0);
+
+    // Find the corresponding index in the cumulative distribution
+    for (int i = 0; i < numElements; i++)
+    {
+        if (randomFraction < cumulativeDistribution[i])
+        {
+            return i;
+        }
+    }
+
+    // In case no index is found (due to rounding), return the last index
+    return numElements - 1;
+}
+
 static void regenerateZoneSegrete()
 {
     Zona_segrete *current = firstZonaSegreta;
@@ -309,6 +237,199 @@ static void regenerateZoneSegrete()
         current = current->zona_successiva;
     }
 }
+
+/**
+ * @brief Visualizza una barra di vita in formato ASCII.
+ *
+ * Questa funzione stampa una barra di vita in formato ASCII, colorata in verde
+ * per rappresentare la vita attuale rispetto alla vita massima.
+ *
+ * @param nome Il nome del personaggio o dell'oggetto a cui appartiene la barra di vita.
+ * @param vita_attuale La quantità di vita attuale.
+ * @param vita_massima La quantità di vita massima.
+ */
+// Funzione per mostrare una barra di vita in ASCII
+static void visualizzaBarraVita(char *nome, int vita_attuale, int vita_massima)
+{
+    int lunghezza_barra = 20;                                             // Lunghezza della barra di vita
+    int lunghezza_vita = (vita_attuale * lunghezza_barra) / vita_massima; // Percentuale della barra
+
+    printf("%s [", nome);
+    for (int i = 0; i < lunghezza_barra; i++)
+    {
+        if (i < lunghezza_vita)
+            printf("\033[0;32m#\033[0m");
+        else
+            printf(" "); // Parte della barra vuota
+    }
+    printf("] %d/%d\n", vita_attuale, vita_massima);
+}
+
+
+/**
+ * @brief Sets the current player as dead and checks if all players are dead.
+ *
+ * This function marks the current player (indicated by `actualTurn`) as dead,
+ * displays a message indicating the player's death, and updates the player's
+ * status in the `playersDead` array. If all players are dead, it prints a
+ * message indicating the end of the game and calls the `termina_gioco` function
+ * to terminate the game.
+ */
+static void setDeadPlayer()
+{
+    char message[100];
+    sprintf(message, "\n%s e' MORTO! Non puo piu partecipare al gioco!", giocatori[actualTurn].nome_giocatore);
+    printGameEvent(message, RED);
+    playersDead[actualTurn] = true;
+
+    if (getIfAllPlayersDead())
+    {
+        printGameEvent("Tutti i giocatori sono morti. Il gioco e' finito!", RED);
+        termina_gioco();
+        return;
+    }
+}
+
+/**
+ * @brief Function to roll a die with a rolling animation.
+ *
+ * This function simulates the rolling of a 6-sided die, displaying a waiting message
+ * to make the animation more realistic. It uses the `rand()` function to generate
+ * a random number between 1 and 6.
+ *
+ * @return An integer representing the result of the die roll (a number between 1 and 6).
+ */
+static int lanciaDado()
+{
+    int result;
+    printf("Lancio del dado...\n");
+#ifdef _WIN32
+    Sleep(500);
+#else
+    sleep(1);
+#endif
+    result = (rand() % 6) + 1; // Dado a 6 facce
+    printf("Il dado ha mostrato: %d\n", result);
+    return result;
+}
+
+/**
+ * @brief Checks if all players are dead.
+ *
+ * This function iterates through the list of players and checks if any player
+ * has more than 0 life points. If at least one player is alive, the function
+ * returns false. If all players are dead, it returns true.
+ *
+ * @return true if all players are dead, false otherwise.
+ */
+static bool getIfAllPlayersDead()
+{
+    for (int i = 0; i < playersNumber; i++)
+    {
+        if (giocatori[i].p_vita > 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief Checks if all players have played their turn.
+ *
+ * This function iterates through the `turnsArray` to determine if every player
+ * has taken their turn. If any player has not taken their turn, the function
+ * returns false. If all players have taken their turn, the function returns true.
+ *
+ * @return true if all players have played their turn, false otherwise.
+ */
+static bool getAllPlayersPlayed()
+{
+    for (int i = 0; i < playersNumber; i++)
+    {
+        if (!turnsArray[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief Sets up the game environment.
+ *
+ * This function initializes the game by performing the following steps:
+ * 1. Retrieves the number of players and allocates memory for player structures.
+ * 2. Initializes each player with a name, class, and attributes.
+ * 3. Selects one player to be the Game Master and announces it.
+ * 4. Generates the game map with secret zones.
+ * 5. Prints details of all secret zones including their type, treasure type, door type,
+ *    and pointers to previous and next zones.
+ *
+ * If memory allocation for players fails, the function prints an error message and exits the program.
+ */
+void imposta_gioco()
+{
+    resetGame();
+    clearScreen();
+    printCustomHeader("CREAZIONE GIOCATORI");
+
+    getPlayersNumber(&playersNumber);
+    turnsArray = (bool *)calloc(playersNumber, sizeof(int));
+    playersDead = (bool *)calloc(playersNumber, sizeof(int));
+    for (int i = 0; i < playersNumber; i++)
+    {
+        turnsArray[i] = false;
+        playersDead[i] = false;
+    }
+    playersCurrentZone = (Zona_segrete **)calloc(playersNumber, sizeof(Zona_segrete *));
+
+    if (turnsArray == NULL)
+    {
+        fprintf(stderr, "Errore nell'allocazione della memoria per l'array dei turni :/\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (playersDead == NULL)
+    {
+        fprintf(stderr, "Errore nell'allocazione della memoria per l'array dei giocatori morti :/\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (playersCurrentZone == NULL)
+    {
+        fprintf(stderr, "Errore nell'allocazione della memoria per l'array delle zone dei giocatori :/\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < playersNumber; i++)
+    {
+        turnsArray[i] = false;
+    }
+
+    // Get the players' names, assign them a class, and initialize their attributes
+    giocatori = (Giocatore *)calloc(playersNumber, sizeof(Giocatore));
+    if (giocatori == NULL)
+    {
+        fprintf(stderr, "Errore nella creazione dei giocatori :/\n");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        initPlayers();
+    }
+
+    clearScreen();
+    gameMaster = setGameMaster();
+    char message[100];
+    sprintf(message, "\n%s e' evoluto a Game Master! E' arrivato il momento di creare la mappa di gioco!", gameMaster->nome_giocatore);
+    printGameEvent(message, BLUE);
+
+    // ######################## MAP ########################
+    printCustomMenu(menuMappaName, optionsMenuMappa, numOptionsMappa);
+    printMenuMappa();
+}
+
 
 // Players initialization
 
@@ -751,7 +872,7 @@ static void cancella_zona(unsigned short int i)
     printGameEvent("Zona segreta cancellata con successo!\n", GREEN);
 }
 
-const char *tipo_zona_to_string(enum tipo_zona zona)
+static const char *tipo_zona_to_string(enum tipo_zona zona)
 {
     switch (zona)
     {
@@ -780,7 +901,7 @@ const char *tipo_zona_to_string(enum tipo_zona zona)
     }
 }
 
-const char *tipo_tesoro_to_string(enum tipo_tesoro tesoro)
+static const char *tipo_tesoro_to_string(enum tipo_tesoro tesoro)
 {
     switch (tesoro)
     {
@@ -797,7 +918,7 @@ const char *tipo_tesoro_to_string(enum tipo_tesoro tesoro)
     }
 }
 
-const char *tipo_porta_to_string(enum tipo_porta porta)
+static const char *tipo_porta_to_string(enum tipo_porta porta)
 {
     switch (porta)
     {
@@ -808,6 +929,21 @@ const char *tipo_porta_to_string(enum tipo_porta porta)
     case porta_da_scassinare:
         return "porta_da_scassinare";
     default:
+        return "unknown";
+    }
+}
+
+static const char *classe_to_string(enum classe_giocatore classe) {
+    switch(classe) {
+        case barbaro:
+        return "barbaro";
+        case nano:
+        return "nano";
+        case elfo:
+        return "elfo";
+        case mago:
+        return "mago";
+        default:
         return "unknown";
     }
 }
@@ -828,12 +964,12 @@ static void stampa_mappa()
     {
         printf("Zona %d:\n", zoneCount++);
         printf("----------------------------------------\n");
-        printf("- Indirizzo Zona Attuale: %p\n", (void *)current);
+        // printf("- Indirizzo Zona Attuale: %p\n", (void *)current);
         printf("- Tipo Zona: %s\n", tipo_zona_to_string(current->tipoZona));
         printf("- Tipo Tesoro: %s\n", tipo_tesoro_to_string(current->tipoTesoro));
         printf("- Tipo Porta: %s\n", tipo_porta_to_string(current->tipoPorta));
-        printf("- Zona Precedente: %p\n", (void *)current->zona_precedente);
-        printf("- Zona Successiva: %p\n", (void *)current->zona_successiva);
+        // printf("- Zona Precedente: %p\n", (void *)current->zona_precedente);
+        // printf("- Zona Successiva: %p\n", (void *)current->zona_successiva);
         printf("----------------------------------------\n");
         current = current->zona_successiva;
     }
@@ -876,7 +1012,7 @@ void chiudi_mappa()
  * inserting a new secret zone, deleting a secret zone, printing the map, and closing the 1
  * The user can choose an option by entering the corresponding number.
  */
-void printMenuMappa()
+static void printMenuMappa()
 {
     int choice;
     do
@@ -934,19 +1070,42 @@ void printMenuMappa()
 
 // ######################## GAME ########################
 
-static bool getAllPlayersPlayed()
-{
-    for (int i = 0; i < playersNumber; i++)
-    {
-        if (!turnsArray[i])
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-void printMenuGiocatore()
+/**
+ * @brief Displays the player menu and handles the player's choice.
+ *
+ * This function displays a menu for the player and processes the player's input.
+ * The player can choose from several options, such as advancing, moving back,
+ * printing player information, printing zone information, taking a treasure, or passing the turn.
+ * The function ensures that the input is a valid integer and handles invalid choices appropriately.
+ * 
+ * The available choices are:
+ * - 1: Advance (avanza)
+ * - 2: Move back (indietreggia)
+ * - 3: Print player information (stampa_giocatore)
+ * - 4: Print zone information (stampa_zona)
+ * - 5: Take a treasure (prendi_tesoro)
+ * - 6: Pass the turn
+ *
+ * The function continues to prompt the player until a valid choice that ends the turn is made.
+ * If the player chooses to advance or take a treasure, the turn is passed.
+ * If the player chooses to move back, print player information, or print zone information,
+ * the menu is displayed again after performing the action.
+ * 
+ * If an invalid choice is made, an error message is displayed and the player is prompted again.
+ * 
+ * @note This function uses several helper functions:
+ * - printGameEvent: Displays a game event message.
+ * - clearInputBuffer: Clears the input buffer.
+ * - avanza: Advances the player.
+ * - clearScreen: Clears the screen.
+ * - printCustomMenu: Prints a custom menu.
+ * - indietreggia: Moves the player back.
+ * - stampa_giocatore: Prints player information.
+ * - stampa_zona: Prints zone information.
+ * - prendi_tesoro: Takes a treasure.
+ * - selectTurn: Selects the next turn.
+ */
+static void printMenuGiocatore()
 {
     int choice;
     bool passTurn = false;
@@ -998,6 +1157,7 @@ void printMenuGiocatore()
         selectTurn();
 }
 
+
 /**
  * @brief Selects the next player's turn randomly.
  *
@@ -1015,6 +1175,7 @@ void printMenuGiocatore()
  */
 static void selectTurn()
 {
+    if(getIfAllPlayersDead()) return; 
     unsigned short int turn = srandomNumberGenerator(0, playersNumber - 1);
     bool allPlayersPlayed = getAllPlayersPlayed();
 
@@ -1064,6 +1225,22 @@ static void selectTurn()
 //     }
 // }
 
+/**
+ * @brief Advances the player to the next zone.
+ *
+ * This function moves the player to the next zone in the linked list of secret zones.
+ * It first checks if there is a next zone to advance to. If not, it prints a message
+ * indicating that there are no more zones to advance to. If there is a next zone, it
+ * attempts to open the door to the next zone. If the door cannot be opened, the function
+ * returns without advancing the player.
+ *
+ * If the player successfully advances to the next zone, the function checks if the player
+ * has reached the last zone. If so, it prints a congratulatory message, sets the player
+ * as the game winner, and terminates the game.
+ *
+ * The function also has a 33% probability of encountering an inhabitant in the new zone.
+ * If an inhabitant is encountered, the player must engage in combat.
+ */
 static void avanza()
 {
     unsigned short int currentPlayer = actualTurn;
@@ -1099,6 +1276,17 @@ static void avanza()
     }
 }
 
+/**
+ * @brief Moves the player back to the previous zone.
+ *
+ * This function moves the player to the previous zone in the linked list of secret zones.
+ * It first checks if there is a previous zone to move back to. If not, it prints a message
+ * indicating that there are no more zones to move back to. If there is a previous zone, it
+ * updates the player's current zone to the previous zone.
+ *
+ * The function also has a 33% probability of encountering an inhabitant in the new zone.
+ * If an inhabitant is encountered, the player must engage in combat.
+ */
 static void indietreggia()
 {
     unsigned short int currentPlayer = actualTurn;
@@ -1121,6 +1309,13 @@ static void indietreggia()
     }
 }
 
+/**
+ * @brief Prints the details of the current player.
+ *
+ * This function retrieves the current player's information and prints it in a formatted manner.
+ * The details include the player's name, class, life points, mind points, attack dice, defense dice,
+ * and special powers.
+ */
 static void stampa_giocatore()
 {
     unsigned short int currentPlayer = actualTurn;
@@ -1128,7 +1323,7 @@ static void stampa_giocatore()
 
     printf("\n==================== GIOCATORE ====================\n");
     printf("Nome Giocatore: %s\n", player->nome_giocatore);
-    printf("Classe: %d\n", player->classe);
+    printf("Classe: %s\n", classe_to_string(player->classe));
     printf("Punti Vita: %d\n", player->p_vita);
     printf("Punti Mente: %d\n", player->mente);
     printf("Dadi Attacco: %d\n", player->dadi_attacco);
@@ -1137,23 +1332,48 @@ static void stampa_giocatore()
     printf("===================================================\n");
 }
 
+/**
+ * @brief Prints the details of the current secret zone for the player whose turn it is.
+ *
+ * This function retrieves the current player's secret zone and prints its details,
+ * including the type of zone, whether a treasure or door is present, and the addresses
+ * of the previous and next zones.
+ *
+ * The output is formatted with headers and separators for better readability.
+ *
+ * @note This function assumes that `actualTurn` and `playersCurrentZone` are defined
+ *       and accessible within the scope.
+ */
 static void stampa_zona()
 {
     unsigned short int currentPlayer = actualTurn;
     Zona_segrete *currentZone = playersCurrentZone[currentPlayer];
 
     printf("\n==================== ZONA SEGRETA ====================\n");
-    printf("Indirizzo Zona Attuale: %p\n", (void *)currentZone);
-    printf("------------------------------------------------------\n");
+    // printf("Indirizzo Zona Attuale: %p\n", (void *)currentZone);
+    // printf("------------------------------------------------------\n");
     printf("Tipo Zona: %s\n", tipo_zona_to_string(currentZone->tipoZona));
     printf("Tesoro Presente: %s\n", currentZone->tipoTesoro != nessun_tesoro ? "Si" : "No");
     printf("Porta Presente: %s\n", currentZone->tipoPorta != nessuna_porta ? "Si" : "No");
-    printf("------------------------------------------------------\n");
-    printf("Zona Precedente: %p\n", (void *)currentZone->zona_precedente);
-    printf("Zona Successiva: %p\n", (void *)currentZone->zona_successiva);
+    // printf("------------------------------------------------------\n");
+    // printf("Zona Precedente: %p\n", (void *)currentZone->zona_precedente);
+    // printf("Zona Successiva: %p\n", (void *)currentZone->zona_successiva);
     printf("======================================================\n");
 }
 
+/**
+ * @brief Attempts to open a door based on its type.
+ *
+ * This function handles the logic for opening different types of doors in the game.
+ * If the door is of type `porta_da_scassinare`, the player must roll a dice to attempt
+ * to pick the lock. Depending on the outcome of the dice roll and the player's mental
+ * ability, the door may be successfully opened or various consequences may occur.
+ * If the door is of type `nessuna_porta`, the player automatically advances to the next zone.
+ * For other door types, the player successfully opens the door and advances.
+ *
+ * @param tipoPorta The type of door to be opened.
+ * @return true if the door is successfully opened or if there is no door; false otherwise.
+ */
 static bool apri_porta(enum tipo_porta tipoPorta)
 {
     unsigned short int currentPlayer = actualTurn;
@@ -1211,6 +1431,18 @@ static bool apri_porta(enum tipo_porta tipoPorta)
     }
 }
 
+/**
+ * @brief Handles the action of taking a treasure in the current zone.
+ *
+ * This function allows the current player to take a treasure from the current zone.
+ * Depending on the type of treasure, the player's life points are adjusted accordingly.
+ * If the treasure is poison, the player loses 2 life points. If the treasure is healing,
+ * the player gains 1 life point. If the treasure is double healing, the player gains 2 life points.
+ * If there is no treasure, a message is displayed indicating that there is no treasure in the room.
+ *
+ * After taking the treasure, the treasure type in the current zone is reset to `nessun_tesoro`
+ * to allow for regeneration of the treasure for the next entry.
+ */
 static void prendi_tesoro()
 {
     unsigned short int currentPlayer = actualTurn;
@@ -1247,6 +1479,19 @@ static void prendi_tesoro()
     currentZone->tipoTesoro = nessun_tesoro;
 }
 
+/**
+ * @brief Handles the action of escaping from a combat situation.
+ *
+ * This function allows the current player to attempt to escape from a combat situation.
+ * The player rolls a dice to determine if the escape is successful. If the roll is less than
+ * or equal to the player's mental ability, the player successfully escapes to the previous zone.
+ * If the escape attempt fails, the player is attacked and must roll a dice to defend against the attack.
+ * The player's life points are adjusted based on the outcome of the attack and defense rolls.
+ *
+ * If the player successfully escapes, a message is displayed indicating the successful escape.
+ * If the escape attempt fails, a message is displayed indicating the failure and the player
+ * takes damage based on the attack and defense rolls.
+ */
 static void scappa()
 {
     unsigned short int currentPlayer = actualTurn;
@@ -1267,8 +1512,6 @@ static void scappa()
         unsigned short int attackRoll = srandomNumberGenerator(1, 6);
         unsigned short int defenseRoll = diceThrow(1, 6, "Tira il dado per difenderti dall'attacco...", false);
 
-        // snprintf(message, sizeof(message), "Hai tirato %hu per la difesa.\n", defenseRoll);
-        // printGameEvent(message, BLUE);
         int damage = attackRoll - defenseRoll;
 
         if (damage > 0)
@@ -1292,66 +1535,17 @@ static void scappa()
     }
 }
 
-// Funzione per mostrare una barra di vita in ASCII
-void visualizzaBarraVita(char *nome, int vita_attuale, int vita_massima)
-{
-    int lunghezza_barra = 20;                                             // Lunghezza della barra di vita
-    int lunghezza_vita = (vita_attuale * lunghezza_barra) / vita_massima; // Percentuale della barra
 
-    printf("%s [", nome);
-    for (int i = 0; i < lunghezza_barra; i++)
-    {
-        if (i < lunghezza_vita)
-            printf("\033[0;32m#\033[0m");
-        else
-            printf(" "); // Parte della barra vuota
-    }
-    printf("] %d/%d\n", vita_attuale, vita_massima);
-}
-
-static bool getIfAllPlayersDead()
-{
-    for (int i = 0; i < playersNumber; i++)
-    {
-        if (giocatori[i].p_vita > 0)
-        {
-            return false;
-            break;
-        }
-    }
-    return true;
-}
-
-static void setDeadPlayer()
-{
-    char message[100];
-    sprintf(message, "\n%s e' MORTO! Non puo piu partecipare al gioco!", giocatori[actualTurn].nome_giocatore);
-    printGameEvent(message, RED);
-    playersDead[actualTurn] = true;
-
-    if (getIfAllPlayersDead())
-    {
-        printGameEvent("Tutti i giocatori sono morti. Il gioco e' finito!", RED);
-        termina_gioco();
-        return;
-    }
-}
-
-// Funzione per lanciare il dado (animazione di lancio)
-int lanciaDado()
-{
-    int result;
-    printf("Lancio del dado...\n");
-#ifdef _WIN32
-    Sleep(500);
-#else
-    sleep(1);
-#endif
-    result = (rand() % 6) + 1; // Dado a 6 facce
-    printf("Il dado ha mostrato: %d\n", result);
-    return result;
-}
-
+/**
+ * @brief Executes a dynamic combat sequence between the player and a dungeon inhabitant.
+ *
+ * This function handles the combat mechanics between the player and an inhabitant of the dungeon.
+ * The player is presented with a menu to choose their action, which can be to attack, defend, or use a healing potion.
+ * The combat continues in turns until either the player or the inhabitant's health points reach zero.
+ *
+ * @param abitante Pointer to the dungeon inhabitant's data structure.
+ * @return true if the player wins the combat or successfully escapes, false if the player loses the combat.
+ */
 // Funzione di combattimento dinamico
 static bool combatti(Abitante_segrete *abitante)
 {
@@ -1514,6 +1708,16 @@ static bool combatti(Abitante_segrete *abitante)
     return false;
 }
 
+/**
+ * @brief Utilizes the special power of the current player if available.
+ *
+ * This function checks if the current player has any special powers left. If so, it decrements the special power count,
+ * prints a game event indicating the special power was used to immediately kill an inhabitant, and returns true.
+ * If no special powers are available, it prints a custom combat menu and a game event indicating that no special powers
+ * are left and the player must continue the combat, then returns false.
+ *
+ * @return true if the special power was used successfully, false otherwise.
+ */
 static bool gioca_potere_speciale()
 {
     unsigned short int currentPlayer = actualTurn;
@@ -1532,11 +1736,18 @@ static bool gioca_potere_speciale()
     }
 }
 
+/**
+ * @brief Starts the game if it has been initialized.
+ *
+ * This function checks if the game has been initialized. If not, it prints an error message
+ * and returns. If the game is initialized, it sets the current zone of each player to the 
+ * first secret zone and then selects the turn.
+ */
 void gioca()
 {
     if (!isGameInitialized)
     {
-        printGameEvent("La mappa non e' stata creata. Impossibile iniziare il gioco.", RED);
+        printGameEvent("La partita non è stata impsotata. Impossibile iniziare il gioco!", RED);
         return;
     }
 
@@ -1544,10 +1755,21 @@ void gioca()
     {
         playersCurrentZone[i] = firstZonaSegreta;
     }
-
+    
     selectTurn();
 }
 
+/**
+ * @brief Terminates the game and displays the end game banner and winner information.
+ * 
+ * This function sets the game state to uninitialized and prints a banner indicating the end of the game.
+ * If there is a winner, it also prints a centered title "VINCITORE" and the winner's name.
+ * 
+ * The banner and winner information are displayed with specific colors.
+ * 
+ * @note This function assumes that `isGameInitialized`, `gameWinner`, `giocatori`, and `actualTurn` are 
+ *       defined and accessible within the scope of this function.
+ */
 void termina_gioco()
 {
     isGameInitialized = false;
