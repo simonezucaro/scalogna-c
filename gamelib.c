@@ -1175,7 +1175,7 @@ static void printMenuGiocatore()
  */
 static void selectTurn()
 {
-    if(getIfAllPlayersDead()) return; 
+    if(getIfAllPlayersDead() || gameWinner != NULL) return; 
     unsigned short int turn = srandomNumberGenerator(0, playersNumber - 1);
     bool allPlayersPlayed = getAllPlayersPlayed();
 
