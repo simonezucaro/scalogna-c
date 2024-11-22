@@ -147,7 +147,7 @@ static int diceThrow(int min, int max, char *message, bool abitante)
     else
     {
         // printf("Premi qualsiasi tasto per lanciare il dado...\n");
-        clearInputBuffer();
+        // clearInputBuffer();
         getchar();
     }
     return srandomNumberGenerator(min, max);
@@ -374,14 +374,14 @@ void imposta_gioco()
     printCustomHeader("CREAZIONE GIOCATORI");
 
     getPlayersNumber();
-    turnsArray = (bool *)calloc(playersNumber, sizeof(int));
-    playersDead = (bool *)calloc(playersNumber, sizeof(int));
+    turnsArray = (bool *)calloc(playersNumber, sizeof(bool));
+    playersDead = (bool *)calloc(playersNumber, sizeof(bool));
     for (int i = 0; i < playersNumber; i++)
     {
         turnsArray[i] = false;
         playersDead[i] = false;
     }
-    playersCurrentZone = (Zona_segrete **)calloc(playersNumber, sizeof(Zona_segrete *));
+    playersCurrentZone = (Zona_segrete **)calloc(playersNumber, sizeof(Zona_segrete **));
 
     if (turnsArray == NULL)
     {
@@ -1231,17 +1231,18 @@ static void selectTurn()
         {
             turnsArray[i] = false;
         }
-        while (turnsArray[turn] || playersDead[turn])
+      do
         {
             turn = srandomNumberGenerator(0, playersNumber - 1);
-        }
+        } while (turnsArray[turn] || playersDead[turn]);
     }
     else
     {
-        while (turnsArray[turn] || playersDead[turn])
+        do
         {
             turn = srandomNumberGenerator(0, playersNumber - 1);
-        }
+        
+        } while (turnsArray[turn] || playersDead[turn]);
     }
     turnsArray[turn] = true;
     actualTurn = turn;
@@ -1744,14 +1745,7 @@ static bool combatti(Abitante_segrete *abitante)
             printGameEvent("L'abitante delle segrete  morto!", GREEN);
             return true;
         }
-
-#ifdef _WIN32
-        Sleep(1000);
-#else
-        sleep(1);
-#endif
     }
-    free(abitante);
     return false;
 }
 
